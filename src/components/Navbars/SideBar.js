@@ -1,126 +1,114 @@
 "use client";
-import React, { useState } from "react";
-import { NavLink, Text, Tooltip } from "@mantine/core";
+import { NavLink, Divider, Tooltip, Text } from "@mantine/core";
+import {
+  IconLayoutDashboard,
+  IconUsers,
+  IconTruck,
+  IconFileText,
+  IconShoppingCart,
+} from "@tabler/icons-react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconCornerDownRight } from "@tabler/icons-react";
 
-const mockData = [
+const menuItems = [
   {
-    id: 1,
     label: "Dashboard",
-    icon: "<svg>...</svg>",
-    link: "/dashboard",
-    children: [],
+    icon: IconLayoutDashboard,
+    path: "/stock/dashboard",
   },
   {
-    id: 2,
     label: "Inventario",
-    icon: "<svg>...</svg>",
-    link: "/inventario",
+    icon: IconLayoutDashboard,
+    path: "/stock/inventario",
+  },
+  {
+    label: "Clientes",
+    icon: IconUsers,
+    path: "/stock/clientes",
+  },
+  {
+    label: "Proveedores",
+    icon: IconTruck,
+    path: "/stock/proveedores",
+  },
+  {
+    label: "Presupuestos",
+    icon: IconFileText,
+    path: "/stock/presupuestos",
+  },
+  {
+    label: "Comercio",
+    icon: IconShoppingCart,
     children: [
       {
-        id: 3,
-        label: "Productos",
-        icon: "<svg>...</svg>",
-        link: "/inventario/productos",
-        children: [],
-      },
-      {
-        id: 4,
-        label: "Categorías",
-        icon: "<svg>...</svg>",
-        link: "/inventario/categorias",
-        children: [],
+        label: "Ventas",
+        path: "/stock/ventas",
       },
     ],
   },
 ];
 
 const Sidebar = () => {
-  return (
-    <nav className="sideBarMenu">
-      {mockData.map((item) => (
-        <NavItem key={item.id} item={item} />
-      ))}
-    </nav>
-  );
-};
-
-const NavItem = ({ item }) => {
-  const { label, icon, link, children } = item;
-  if (children && children.length > 0) {
-    return <NavItemHeader item={item} />;
-  }
-
-  return (
-    <NavLink
-      href={link}
-      label={label}
-      leftSection={
-        <span
-          className="sideBarMenu_navIcon"
-          dangerouslySetInnerHTML={{ __html: icon }}
-        ></span>
-      }
-      className="sideBarMenu_navItem"
-    />
-  );
-};
-
-const NavItemHeader = ({ item }) => {
-  const { label, icon, link, children } = item;
   const pathname = usePathname();
-  const [expanded, setExpanded] = useState(pathname?.includes(link));
 
-  const handleExpand = (e) => {
-    e.preventDefault();
-    setExpanded((prev) => !prev);
-  };
+  const isActive = (path) => pathname === path;
 
   return (
-    <NavLink
-      href={link}
-      label={label}
-      leftSection={
-        <span
-          className="sideBarMenu_navIcon"
-          dangerouslySetInnerHTML={{ __html: icon }}
-        ></span>
-      }
-      onClick={handleExpand}
-      defaultOpened={expanded}
-      childrenOffset={0}
-    >
-      <div className="sideBarMenu_navSubItem">
-        {children.map((subItem) => (
-          subItem.children?.length > 0 ? (
-            <NavItemHeader key={subItem.id} item={subItem} />
-          ) : (
+    <nav>
+      {menuItems.map((item) => (
+        <NavLink
+          key={item.label}
+          label={item.label}
+          component={item.path ? Link : undefined}
+          href={item.path}
+          leftSection={item.icon ? <item.icon size={18} /> : null}
+          active={isActive(item.path)}
+          defaultOpened={item.children?.some((child) => isActive(child.path))}
+          styles={(theme) => ({
+            root: {
+                backgroundColor: isActive(item.path) ? "#EE0E0F" : "transparent",
+              color: "white",
+              transition: "background-color 0.2s ease, color 0.2s ease",
+              "&:hover": {
+                backgroundColor: "#EE0E0F",
+                color: "white",
+              },
+            },
+            label: { color: "inherit" },
+            icon: { color: "inherit" },
+          })}
+        >
+          {item.children?.map((child) => (
             <NavLink
-              key={subItem.id}
-              href={subItem.link}
+              key={child.label}
+              component={Link}
+              href={child.path}
               label={
-                <Tooltip label={subItem.label} position="right">
-                  <Text truncate="end">{subItem.label}</Text>
+                <Tooltip label={child.label} position="right">
+                  <Text truncate="end">{child.label}</Text>
                 </Tooltip>
               }
-              leftSection={
-                <>
-                  <IconCornerDownRight className="sideBarMenu_navIconx" />
-                  <span
-                    className="sideBarMenu_navIcon"
-                    dangerouslySetInnerHTML={{ __html: subItem.icon }}
-                  ></span>
-                </>
-              }
-              className={`sideBarMenu_navItem ${
-                pathname === subItem.link && "sideBarMenu_navItemActivo"
-              }`}
+              active={isActive(child.path)}
+              styles={(theme) => ({
+                root: {
+                  backgroundColor: "transparent",
+                  color: "white",
+                  transition: "background-color 0.2s ease, color 0.2s ease",
+                  "&:hover": {
+                    backgroundColor: "#EE0E0F",
+                    color: "white",
+                  },
+                },
+                label: { color: "inherit" },
+                icon: { color: "inherit" },
+              })}
             />
-          )
-        ))}
-      </div>
-    </NavLink>
+          ))}
+        </NavLink>
+      ))}
+
+      <Divider variant="dashed" my="sm" color="#EE0E0F" />
+    </nav>
   );
 };
 

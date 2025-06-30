@@ -76,7 +76,7 @@ export function LayoutBase({ children }) {
 
       {/* Sidebar */}
       <AppShell.Navbar p="xs" bg={"#140D0D"} >
-    
+      <Sidebar />
       </AppShell.Navbar>
 
       {/* Contenido principal */}
