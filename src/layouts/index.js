@@ -24,13 +24,14 @@ export function LayoutBase({ children }) {
 
   return (
     <AppShell
-      header={{ height: 71 }}
+     
+      header={{ height: 71, bg: "green" }}
       navbar={{
         width: 300,
         breakpoint: "sm",
         collapsed: { mobile: !mobileOpened, desktop: !desktopOpened },
       }}
-      padding="md"
+     
     >
       {/* Header */}
       <AppShell.Header bg={"#140D0D"}>
@@ -59,6 +60,7 @@ export function LayoutBase({ children }) {
         mx="sm"
         bg="gray.4"
         style={{ alignSelf: "center" }}
+        
       />
 
       <Link href="/">
@@ -75,13 +77,13 @@ export function LayoutBase({ children }) {
       </AppShell.Header>
 
       {/* Sidebar */}
-      <AppShell.Navbar p="xs" bg={"#140D0D"} >
+      <AppShell.Navbar p="xs"  bg={"#140D0D"} >
       <Sidebar />
       </AppShell.Navbar>
 
       {/* Contenido principal */}
-      <AppShell.Main>
-        <Container fluid>{children}</Container>
+      <AppShell.Main >
+        <Container fluid >{children}</Container>
       </AppShell.Main>
     </AppShell>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { LayoutBase } from "@/layouts";
 import {
   Button,
@@ -14,8 +14,16 @@ import {
   Pagination,
   ScrollArea,
   ActionIcon,
+  Modal,
+  Select,
+  NumberInput,
+  Checkbox,
+  Loader,
+  
 } from "@mantine/core";
 import BreadcrumbsNav from "@/components/Breadcrums";
+import { notifications } from "@mantine/notifications";
+import { useForm } from "@mantine/form";
 import {
   IconStackMiddle,
   IconCoins,
@@ -24,53 +32,9 @@ import {
   IconTimeline,
   IconPencil,
   IconTrash,
-  IconTimeDuration0,
 } from "@tabler/icons-react";
 
-const productos = [
-  {
-    nombre: "HTN",
-    descripcion: "PROTEINA",
-    marca: "Optimum",
-    proveedor: "Natural Sp",
-    stock: 10,
-    compra: "$300",
-    venta: "$1000",
-    fecha: "21-08-2024",
-  },
-  {
-    nombre: "NUTRILAB",
-    descripcion: "PRE ENTRENO",
-    marca: "Dymatize",
-    proveedor: "Lebron",
-    stock: 45,
-    compra: "$300",
-    venta: "$1000",
-    fecha: "21-08-2024",
-  },
-  {
-    nombre: "Producto 4",
-    descripcion: "Descripción 4",
-    marca: "MuscleTech",
-    proveedor: "Capsule",
-    stock: 34,
-    compra: "$300",
-    venta: "$1000",
-    fecha: "21-08-2024",
-  },
-  {
-    nombre: "Producto 5",
-    descripcion: "Descripción 5",
-    marca: "BSN",
-    proveedor: "GenTech",
-    stock: 23,
-    compra: "$300",
-    venta: "$1000",
-    fecha: "21-08-2024",
-  },
-];
-
-const rowsPerPage = 2;
+const rowsPerPage = 5;
 
 const items = [
   {
@@ -99,28 +63,107 @@ const items = [
   },
 ];
 
-const index = () => {
+const Index = () => {
   const [page, setPage] = useState(1);
+  const [opened, setOpened] = useState(false);
+  const [productos, setProductos] = useState([]);
+  const [loading, setLoading] = useState(true);
+   const [usarPorcentaje, setUsarPorcentaje] = useState(false);
+
+ const form = useForm({
+    initialValues: {
+      nombre: "",
+      proveedor: "",
+      marca: "",
+      codigo_producto: "",
+      descripcion: "",
+      plazo_entrega: "",
+      tipo_envio: "",
+      garantia: "",
+      modelo: "",
+      categoria: "",
+      precio_compra: 0,
+      precio_venta: 0,
+      proveedores: [],
+    },
+    validate: {
+      nombre: value => (value.length < 2 ? "El nombre es obligatorio" : null),
+    },
+  });
+
+  const fetchProductos = async () => {
+    try {
+      const res = await fetch("/api/stock/productos");
+      const data = await res.json();
+      setProductos(data);
+    } catch (err) {
+      console.error("Error al obtener productos:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProductos();
+  }, []);
+
+   useEffect(() => {
+    if (usarPorcentaje) {
+      const { precio_compra, porcentaje } = form.values;
+      const precio_venta = precio_compra + (precio_compra * porcentaje / 100);
+      form.setFieldValue("precio_venta", Math.round(precio_venta * 100) / 100);
+    }
+  }, [form.values.precio_compra, form.values.porcentaje, usarPorcentaje]);
+
+
+
+   const handleSubmit = async values => {
+    try {
+      const res = await fetch("/api/stock/productos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message);
+
+      notifications.show({
+        title: "Producto creado",
+        message: "Se creó el producto correctamente",
+        color: "green",
+      });
+      setOpened(false);
+      form.reset();
+      fetchProductos();
+    } catch (error) {
+      notifications.show({
+        title: "Error",
+        message: error.message,
+        color: "red",
+      });
+    }
+  };
 
   const start = (page - 1) * rowsPerPage;
   const end = start + rowsPerPage;
   const pageRows = productos.slice(start, end);
 
-  const handleCardClick = (path) => {
+  const handleCardClick = path => {
     window.location.href = path;
   };
 
   const rows = pageRows.map((item, index) => (
-    <tr ta="center" key={index}>
-      <td ta="center" style={{ minWidth: 120 }}>{item.nombre}</td>
-      <td ta="center" style={{ minWidth: 150 }}>{item.descripcion}</td>
-      <td ta="center" style={{ minWidth: 120 }}>{item.marca}</td>
-      <td ta="center" style={{ minWidth: 120 }}>{item.proveedor}</td>
-      <td ta="center" style={{ minWidth: 80, textAlign: "center" }}>{item.stock}</td>
-      <td ta="center" style={{ minWidth: 100, textAlign: "right" }}>{item.compra}</td>
-      <td ta="center" style={{ minWidth: 100, textAlign: "right" }}>{item.venta}</td>
-      <td ta="center" style={{ minWidth: 130, textAlign: "center" }}>{item.fecha}</td>
-      <td ta="center" style={{ minWidth: 100 }}>
+    <tr align="start" ta key={index}>
+      <td >{item.nombre}</td>
+      <td>{item.descripcion}</td>
+      <td >{item.marca}</td>
+      <td >{item.proveedores || "-"}</td>
+      <td >{item.cantidad}</td>
+      <td >${parseFloat(item.precio_compra).toLocaleString()}</td>
+      <td >${parseFloat(item.precio_venta).toLocaleString()}</td>
+      <td >{new Date(item.ultima_modificacion).toLocaleDateString()}</td>
+      <td >
         <Group gap="xs" justify="center">
           <ActionIcon color="blue" variant="subtle">
             <IconPencil size={16} />
@@ -137,10 +180,7 @@ const index = () => {
     <LayoutBase>
       <Container size="lg" py="xl">
         <BreadcrumbsNav
-          items={[
-            { title: "Inicio", href: "/" },
-            { title: "Stock", href: "/stock" },
-          ]}
+          items={[{ title: "Inicio", href: "/" }, { title: "Stock", href: "/stock" }]}
           separator="/"
           separatorColor="#EE0E0F"
           currentColor="#EE0E0F"
@@ -149,18 +189,21 @@ const index = () => {
         <Grid mt={30}>
           <Grid.Col span={12}>
             <Title order={1}>Inventario</Title>
-            <Text c="dimmed" order={4}>
-              Registro detallado de sus productos
-            </Text>
+            <Text c="dimmed" order={4}>Registro detallado de sus productos</Text>
           </Grid.Col>
 
-          <Grid.Col mt={30} span={12}>
-            <Button variant="outline" color="#EE0E0F">
-              Agregar Producto
+          <Grid.Col mt={30} span={3}>
+            <Button variant="outline" color="#EE0E0F" onClick={() => setOpened(true)}>
+              Crear un Producto
+            </Button>
+          </Grid.Col>
+          <Grid.Col mt={30} span={9}>
+            <Button variant="outline" color="#EE0E0F" onClick={() => setOpened(true)}>
+              Agregar unidades
             </Button>
           </Grid.Col>
 
-          {items.map((item) => (
+          {items.map(item => (
             <Grid.Col key={item.label} span={{ base: 12, sm: 3, md: 3 }}>
               <Card
                 shadow="sm"
@@ -175,69 +218,81 @@ const index = () => {
                     <item.icon size={24} />
                     <Title order={4}>{item.label}</Title>
                   </Group>
-                  <Text size="sm" c="dimmed">
-                    {item.description}
-                  </Text>
+                  <Text size="sm" c="dimmed">{item.description}</Text>
                 </Stack>
               </Card>
             </Grid.Col>
           ))}
 
           <Grid.Col mt={30} span={12}>
-            <TextInput
-              placeholder="Buscar producto..."
-              leftSection={<IconSearch size={18} />}
-            />
+            <TextInput placeholder="Buscar producto..." leftSection={<IconSearch size={18} />} />
           </Grid.Col>
 
           <Grid.Col span={12}>
             <ScrollArea h={400}>
-              <Table
-                highlightOnHover
-                withTableBorder
-                striped
-                withColumnBorders
-              >
-                <thead>
-                  <tr>
-                    <th style={{ minWidth: 120 }}>Producto</th>
-                    <th style={{ minWidth: 150 }}>Descripción</th>
-                    <th style={{ minWidth: 120 }}>Marca</th>
-                    <th style={{ minWidth: 120 }}>Proveedor</th>
-                    <th style={{ minWidth: 80, textAlign: "center" }}>
-                      Stock
-                    </th>
-                    <th style={{ minWidth: 100, textAlign: "right" }}>
-                      Compra
-                    </th>
-                    <th style={{ minWidth: 100, textAlign: "right" }}>
-                      Venta
-                    </th>
-                    <th style={{ minWidth: 130, textAlign: "center" }}>
-                      Ult. Modif.
-                    </th>
-                    <th style={{ minWidth: 100, textAlign: "center" }}>
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>{rows}</tbody>
-              </Table>
-
-              <Group justify="center" mt="md">
-                <Pagination
-                  total={Math.ceil(productos.length / rowsPerPage)}
-                  value={page}
-                  onChange={setPage}
-                  color="dark"
-                />
-              </Group>
+              {loading ? (
+                <Group justify="center" py="xl">
+                  <Loader />
+                </Group>
+              ) : (
+                <>
+                  <Table withTableBorder withColumnBorders highlightOnHover>
+                    <thead>
+                      <tr >
+                        <th align="start">Producto</th>
+                        <th align="start">Descripción</th>
+                        <th align="start">Marca</th>
+                        <th align="start">Proveedor</th>
+                        <th align="start">Stock</th>
+                        <th align="start">Compra</th>
+                        <th align="start">Venta</th>
+                        <th align="start">Ult. Modif.</th>
+                        <th align="start">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>{rows}</tbody>
+                  </Table>
+                  <Group justify="center" mt="md">
+                    <Pagination
+                      total={Math.ceil(productos.length / rowsPerPage)}
+                      value={page}
+                      onChange={setPage}
+                      color="dark"
+                    />
+                  </Group>
+                </>
+              )}
             </ScrollArea>
           </Grid.Col>
         </Grid>
+
+        <Modal opened={opened} onClose={() => setOpened(false)} title="Crear Producto" bg={"red"} transitionProps={{ transition: 'fade', duration: 600, timingFunction: 'linear' }}  size="lg">
+          <form onSubmit={form.onSubmit(handleSubmit)}>
+            <Grid>
+              <Grid.Col  span={12}><Title order={4}>Información Importante</Title></Grid.Col>
+              <Grid.Col span={6}><TextInput label="Nombre" {...form.getInputProps("nombre")} /></Grid.Col>
+              <Grid.Col span={6}><TextInput label="Marca" {...form.getInputProps("marca")} /></Grid.Col>
+              <Grid.Col span={6}><Select label="Proveedor" data={["1", "2", "3"]} multiple {...form.getInputProps("proveedores")} /></Grid.Col>
+              <Grid.Col span={12}><Title order={4}>Información del producto</Title></Grid.Col>
+              <Grid.Col span={6}><TextInput label="Código" {...form.getInputProps("codigo_producto")} /></Grid.Col>
+              <Grid.Col span={6}><TextInput label="Plazo de entrega" {...form.getInputProps("plazo_entrega")} /></Grid.Col>
+              <Grid.Col span={6}><TextInput label="Tipo de envío" {...form.getInputProps("tipo_envio")} /></Grid.Col>
+              <Grid.Col span={6}><TextInput label="Garantía" {...form.getInputProps("garantia")} /></Grid.Col>
+              <Grid.Col span={6}><TextInput label="Modelo" {...form.getInputProps("modelo")} /></Grid.Col>
+              <Grid.Col span={6}><TextInput label="Categoría" {...form.getInputProps("categoria")} /></Grid.Col>
+              <Grid.Col span={12}><TextInput label="Descripción" multiline minRows={2} {...form.getInputProps("descripcion")} /></Grid.Col>
+              <Grid.Col span={12}><Title order={4}>Información de venta</Title></Grid.Col>
+              <Grid.Col span={6}><NumberInput label="Precio de compra" prefix="$" {...form.getInputProps("precio_compra")} /></Grid.Col>
+              <Grid.Col span={6}><NumberInput label="Precio de venta" prefix="$" {...form.getInputProps("precio_venta")} /></Grid.Col>
+               <Grid.Col span={12}><Checkbox label="Utilizar porcentaje" checked={usarPorcentaje} onChange={(event) => setUsarPorcentaje(event.currentTarget.checked)} /></Grid.Col>
+              <Grid.Col span={6}><NumberInput label="Porcentaje de ganancia" suffix="%" disabled={!usarPorcentaje} {...form.getInputProps("porcentaje")} /></Grid.Col>
+              <Grid.Col span={12}><Button variant="outline" color="#EE0E0F" type="submit" fullWidth >Crear Producto</Button></Grid.Col>
+            </Grid>
+          </form>
+        </Modal>
       </Container>
     </LayoutBase>
   );
 };
 
-export default index;
+export default Index;
