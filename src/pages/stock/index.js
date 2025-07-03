@@ -69,6 +69,9 @@ const Index = () => {
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
    const [usarPorcentaje, setUsarPorcentaje] = useState(false);
+   const [modoEdicion, setModoEdicion] = useState(false);
+const [productoEditandoId, setProductoEditandoId] = useState(null);
+
 
  const form = useForm({
     initialValues: {
@@ -117,33 +120,80 @@ const Index = () => {
 
 
 
-   const handleSubmit = async values => {
-    try {
-      const res = await fetch("/api/stock/productos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
-      const data = await res.json();
+  const handleSubmit = async (values) => {
+  try {
+    const method = modoEdicion ? "PUT" : "POST";
+    const url = modoEdicion
+      ? `/api/stock/productos/${productoEditandoId}`
+      : `/api/stock/productos`;
 
-      if (!res.ok) throw new Error(data.message);
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values),
+    });
+    const data = await res.json();
 
-      notifications.show({
-        title: "Producto creado",
-        message: "Se creó el producto correctamente",
-        color: "green",
-      });
-      setOpened(false);
-      form.reset();
-      fetchProductos();
-    } catch (error) {
-      notifications.show({
-        title: "Error",
-        message: error.message,
-        color: "red",
-      });
-    }
-  };
+    if (!res.ok) throw new Error(data.message);
+
+    notifications.show({
+      title: modoEdicion ? "Producto actualizado" : "Producto creado",
+      message: modoEdicion
+        ? "Se actualizó el producto correctamente"
+        : "Se creó el producto correctamente",
+      color: "green",
+    });
+
+    setOpened(false);
+    form.reset();
+    fetchProductos();
+    setModoEdicion(false);
+    setProductoEditandoId(null);
+  } catch (error) {
+    notifications.show({
+      title: "Error",
+      message: error.message,
+      color: "red",
+    });
+  }
+};
+
+
+  const handleDelete = async (id) => {
+  if (!confirm("¿Estás seguro que deseas eliminar este producto?")) return;
+  try {
+    const res = await fetch(`/api/stock/productos/${id}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.message);
+
+    notifications.show({
+      title: "Producto eliminado",
+      message: "Se eliminó el producto correctamente",
+      color: "green",
+    });
+
+    fetchProductos(); // Recargar lista
+  } catch (error) {
+    notifications.show({
+      title: "Error",
+      message: error.message,
+      color: "red",
+    });
+  }
+};
+
+const handleEdit = (producto) => {
+  form.setValues({
+    ...producto,
+    proveedores: producto.proveedores || [],
+  });
+  setModoEdicion(true);
+  setProductoEditandoId(producto.id_producto);
+  setOpened(true);
+};
 
   const start = (page - 1) * rowsPerPage;
   const end = start + rowsPerPage;
@@ -154,7 +204,7 @@ const Index = () => {
   };
 
   const rows = pageRows.map((item, index) => (
-    <tr align="start" ta key={index}>
+    <tr align="start"  key={index}>
       <td >{item.nombre}</td>
       <td>{item.descripcion}</td>
       <td >{item.marca}</td>
@@ -163,15 +213,15 @@ const Index = () => {
       <td >${parseFloat(item.precio_compra).toLocaleString()}</td>
       <td >${parseFloat(item.precio_venta).toLocaleString()}</td>
       <td >{new Date(item.ultima_modificacion).toLocaleDateString()}</td>
-      <td >
-        <Group gap="xs" justify="center">
-          <ActionIcon color="blue" variant="subtle">
-            <IconPencil size={16} />
-          </ActionIcon>
-          <ActionIcon color="red" variant="subtle">
-            <IconTrash size={16} />
-          </ActionIcon>
-        </Group>
+      <td  >
+        <Group gap="xs" >
+        <ActionIcon color="blue" variant="subtle" onClick={() => handleEdit(item)}>
+          <IconPencil size={16} />
+        </ActionIcon>
+        <ActionIcon color="red" variant="subtle" onClick={() => handleDelete(item.id_producto)}>
+          <IconTrash size={16} />
+        </ActionIcon>
+      </Group>
       </td>
     </tr>
   ));
@@ -266,7 +316,18 @@ const Index = () => {
           </Grid.Col>
         </Grid>
 
-        <Modal opened={opened} onClose={() => setOpened(false)} title="Crear Producto" bg={"red"} transitionProps={{ transition: 'fade', duration: 600, timingFunction: 'linear' }}  size="lg">
+       <Modal
+  opened={opened}
+  onClose={() => {
+    setOpened(false);
+    form.reset();
+    setModoEdicion(false);
+    setProductoEditandoId(null);
+  }}
+  title={modoEdicion ? "Editar Producto" : "Crear Producto"}
+  size="lg"
+  transitionProps={{ transition: "fade", duration: 600, timingFunction: "linear" }}
+>
           <form onSubmit={form.onSubmit(handleSubmit)}>
             <Grid>
               <Grid.Col  span={12}><Title order={4}>Información Importante</Title></Grid.Col>
