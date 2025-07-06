@@ -1,11 +1,12 @@
 "use client";
-import { NavLink, Divider, Tooltip, Text } from "@mantine/core";
+import { NavLink, Divider, Tooltip, Text, Flex, Group, ActionIcon } from "@mantine/core";
 import {
   IconLayoutDashboard,
   IconUsers,
   IconTruck,
   IconFileText,
   IconShoppingCart,
+  IconBrandFacebook, IconBrandInstagram
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -54,7 +55,9 @@ const Sidebar = () => {
   const isActive = (path) => pathname === path;
 
   return (
-    <nav>
+    <Flex direction="column" justify="space-between" h="100%">
+    {/* Sección principal del menú */}
+    <div>
       {menuItems.map((item) => (
         <NavLink
           key={item.label}
@@ -64,9 +67,9 @@ const Sidebar = () => {
           leftSection={item.icon ? <item.icon size={18} /> : null}
           active={isActive(item.path)}
           defaultOpened={item.children?.some((child) => isActive(child.path))}
-          styles={(theme) => ({
+          styles={{
             root: {
-                backgroundColor: isActive(item.path) ? "#EE0E0F" : "transparent",
+              backgroundColor: isActive(item.path) ? "#EE0E0F" : "transparent",
               color: "white",
               transition: "background-color 0.2s ease, color 0.2s ease",
               "&:hover": {
@@ -76,7 +79,7 @@ const Sidebar = () => {
             },
             label: { color: "inherit" },
             icon: { color: "inherit" },
-          })}
+          }}
         >
           {item.children?.map((child) => (
             <NavLink
@@ -89,7 +92,7 @@ const Sidebar = () => {
                 </Tooltip>
               }
               active={isActive(child.path)}
-              styles={(theme) => ({
+              styles={{
                 root: {
                   backgroundColor: "transparent",
                   color: "white",
@@ -101,14 +104,42 @@ const Sidebar = () => {
                 },
                 label: { color: "inherit" },
                 icon: { color: "inherit" },
-              })}
+              }}
             />
           ))}
         </NavLink>
       ))}
 
       <Divider variant="dashed" my="sm" color="#EE0E0F" />
-    </nav>
+    </div>
+
+    {/* Footer inferior dentro del sidebar */}
+    <Flex direction="column" gap="xs" align="center" mt="sm" p="xs">
+      <Text c="gray.4" size="xs" ta="center">
+        © {new Date().getFullYear()} WASI
+      </Text>
+      <Group gap="xs">
+        <ActionIcon
+          variant="transparent"
+          color="gray.4"
+          component="a"
+          href="https://facebook.com"
+          target="_blank"
+        >
+          <IconBrandFacebook size={16} />
+        </ActionIcon>
+        <ActionIcon
+          variant="transparent"
+          color="gray.4"
+          component="a"
+          href="https://instagram.com"
+          target="_blank"
+        >
+          <IconBrandInstagram size={16} />
+        </ActionIcon>
+      </Group>
+    </Flex>
+  </Flex>
   );
 };
 

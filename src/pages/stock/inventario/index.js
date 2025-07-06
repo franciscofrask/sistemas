@@ -375,7 +375,7 @@ const Index = () => {
 
   return (
     <LayoutBase>
-      <Container size="lg" py="xs">
+      <Container size="lg" >
         <BreadcrumbsNav
           items={[
             { title: "Inicio", href: "/" },
@@ -488,7 +488,7 @@ const Index = () => {
                         value={pageProductos}
                         onChange={setPageProductos}
                         color="#ee0e0f"
-                        siblings={1}
+                        siblings={0}
                         boundaries={1}
                       />
                     </Group>
@@ -514,7 +514,7 @@ const Index = () => {
                         defaultValue={pageUnidades}
                         onChange={setPageUnidades}
                         color="#ee0e0f"
-                        siblings={1}
+                       siblings={0}
                         boundaries={1}
                       />
                     </Group>
