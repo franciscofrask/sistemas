@@ -30,31 +30,29 @@ export default function BreadcrumbsNav({
 
     if (isLast) {
       return (
-        <Anchor
-          key={index}
-          style={{
-            color: currentColor,
-            fontWeight: 600,
-            cursor: "default",
-            textDecoration: "none",
-          }}
-        >
-          {item.title}
-        </Anchor>
+       <Anchor
+  key={index}
+  className="breadcrumb-last"
+>
+  {item.title}
+</Anchor>
       );
     }
 
     return (
-      <Anchor
-        key={index}
-        component={Link}
-        href={item.href}
-        style={{
-          color: "white",
-          textDecoration: "none",
-        }}
-      >
+     <Anchor
+  key={index}
+  style={{
+    color: `#EE0E0F !important`,
+    fontWeight: 600,
+    cursor: "default",
+    textDecoration: "none",
+  }}
+>
+
+
         {item.title}
+        {console.log(currentColor)}
       </Anchor>
     );
   });
@@ -66,7 +64,7 @@ export default function BreadcrumbsNav({
       mt="sm"
       styles={{
         separator: {
-          color: separatorColor,
+          color: "#EE0E0F",
         },
       }}
     >

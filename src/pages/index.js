@@ -11,7 +11,7 @@ export default function Home() {
         Sitemas
     </Title>
 
-     <Link href="/stock">
+     <Link href="/stock/inventario">
        <Button >
         Get Started
       </Button>

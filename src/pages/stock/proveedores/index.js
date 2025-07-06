@@ -238,8 +238,8 @@ const handleEdit = (producto) => {
 
         <Grid mt={30}>
           <Grid.Col span={12}>
-            <Title order={1}>Inventario</Title>
-            <Text c="dimmed" order={4}>Registro detallado de sus productos</Text>
+            <Title order={1}>Proveedores</Title>
+            <Text c="dimmed" order={4}>Registro detallado de sus proveedores</Text>
           </Grid.Col>
 
           <Grid.Col mt={30} span={3}>

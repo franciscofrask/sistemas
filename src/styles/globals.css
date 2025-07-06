@@ -1,0 +1,17 @@
+.breadcrumb-last {
+  color: #EE0E0F !important;
+   font-weight: bold !important;
+   
+}
+.modal-header {
+  background-color: #f9f9f9;
+  border-bottom: 1px solid #ccc;
+  padding: 16px;
+}
+
+.modal-title {
+  font-weight: 700;
+  font-size: 20px;
+  
+}
+
