@@ -4,11 +4,12 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   if (req.method === 'PUT') {
-    const { nombre, apellido, email, telefono, direccion } = req.body;
-    await db.query('CALL EditarCliente(?, ?, ?, ?, ?, ?)', [
+    const { nombre, apellido, email, telefono, direccion, dni } = req.body;
+    await db.query('CALL EditarCliente(?, ?, ?, ?, ?, ?, ?)', [
       id,
       nombre,
       apellido,
+      dni,
       email,
       telefono,
       direccion,

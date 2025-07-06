@@ -2,18 +2,22 @@ import { db } from '@/lib/db';
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
-    const [rows] = await db.query('SELECT * FROM proveedores');
+    const [rows] = await db.query('SELECT * FROM proveedores WHERE activo IS TRUE');
     return res.status(200).json(rows);
+    
   }
 
+
   if (req.method === 'POST') {
-    const { razon_social, cuit, telefono, email, direccion } = req.body;
-    await db.query('CALL AgregarProveedor(?, ?, ?, ?, ?)', [
+    console.log(req.body);
+    const { razon_social, cuit_cuil,email, telefono, direccion, condiciones_pago } = req.body;
+    await db.query('CALL AgregarProveedor(?, ?, ?, ?, ?, ?)', [
       razon_social,
-      cuit,
-      telefono,
+      cuit_cuil,
       email,
+      telefono,
       direccion,
+      condiciones_pago
     ]);
     return res.status(201).json({ message: 'Proveedor agregado' });
   }

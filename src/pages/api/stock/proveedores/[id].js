@@ -4,14 +4,16 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   if (req.method === 'PUT') {
-    const { razon_social, cuit, telefono, email, direccion } = req.body;
-    await db.query('CALL EditarProveedor(?, ?, ?, ?, ?, ?)', [
+    console.log(req.body);
+    const { razon_social, cuit_cuil, email, telefono, direccion, condiciones_pago  } = req.body;
+    await db.query('CALL EditarProveedor(?, ?, ?, ?, ?, ?, ?)', [
       id,
       razon_social,
-      cuit,
-      telefono,
+      cuit_cuil,
       email,
+      telefono,
       direccion,
+      condiciones_pago
     ]);
     return res.status(200).json({ message: 'Proveedor actualizado' });
   }

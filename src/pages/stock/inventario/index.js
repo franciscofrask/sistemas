@@ -379,7 +379,7 @@ const Index = () => {
         <BreadcrumbsNav
           items={[
             { title: "Inicio", href: "/" },
-            { title: "Stock", href: "/stock" },
+            { title: "inventario", href: "/stock" },
           ]}
           separator="/"
           separatorColor="#EE0E0F"

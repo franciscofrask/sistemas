@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       const [rows] = await db.query(
-        'SELECT id_almacen, nombre, ubicacion FROM almacenes WHERE activo = TRUE'
+        'SELECT id_almacen, nombre, ubicacion, descripcion FROM almacenes WHERE activo = TRUE'
       );
       return res.status(200).json(rows);
     } catch (error) {
@@ -14,12 +14,12 @@ export default async function handler(req, res) {
 
   else if (req.method === 'POST') {
     try {
-      const { nombre, ubicacion } = req.body;
+      const { nombre, ubicacion, descripcion } = req.body;
       if (!nombre || !ubicacion) {
         return res.status(400).json({ message: 'Faltan datos' });
       }
 
-      await db.query('CALL CrearAlmacen(?, ?)', [nombre, ubicacion]);
+      await db.query('CALL CrearAlmacen(?, ?, ?)', [nombre, ubicacion, descripcion]);
       return res.status(201).json({ message: 'Almacén creado' });
     } catch (error) {
       return res.status(500).json({ message: error.message });

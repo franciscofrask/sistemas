@@ -6,7 +6,9 @@ import {
   IconTruck,
   IconFileText,
   IconShoppingCart,
-  IconBrandFacebook, IconBrandInstagram
+  IconBrandFacebook, IconBrandInstagram,
+  IconStack,
+  IconBuildingWarehouse 
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -19,18 +21,23 @@ const menuItems = [
   },
   {
     label: "Inventario",
-    icon: IconLayoutDashboard,
+    icon: IconStack,
     path: "/stock/inventario",
   },
   {
-    label: "Clientes",
-    icon: IconUsers,
-    path: "/stock/clientes",
+    label: "Almacenes",
+    icon: IconBuildingWarehouse,
+    path: "/stock/almacenes",
   },
   {
     label: "Proveedores",
     icon: IconTruck,
     path: "/stock/proveedores",
+  },
+   {
+    label: "Clientes",
+    icon: IconUsers,
+    path: "/stock/clientes",
   },
   {
     label: "Presupuestos",
@@ -116,7 +123,7 @@ const Sidebar = () => {
     {/* Footer inferior dentro del sidebar */}
     <Flex direction="column" gap="xs" align="center" mt="sm" p="xs">
       <Text c="gray.4" size="xs" ta="center">
-        © {new Date().getFullYear()} WASI
+        © {new Date().getFullYear()} Francsico Frasconá
       </Text>
       <Group gap="xs">
         <ActionIcon
