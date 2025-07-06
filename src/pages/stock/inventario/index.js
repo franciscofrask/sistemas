@@ -11,6 +11,7 @@ import {
   TextInput,
   Title,
   Table,
+  Tabs,
   Pagination,
   ScrollArea,
   ActionIcon,
@@ -36,6 +37,7 @@ import {
   IconSettings,
   IconEye,
   IconLibraryPlus,
+  IconDots,
 } from "@tabler/icons-react";
 
 const rowsPerPage = 5;
@@ -68,7 +70,8 @@ const items = [
 ];
 
 const Index = () => {
-  const [page, setPage] = useState(1);
+  const [pageProductos, setPageProductos] = useState(1);
+  const [pageUnidades, setPageUnidades] = useState(1);
   const [opened, setOpened] = useState(false);
   const [productos, setProductos] = useState([]);
   const [almacenes, setAlmacenes] = useState([]);
@@ -79,8 +82,10 @@ const Index = () => {
   const [openedUnidad, setOpenedUnidad] = useState(false);
   const [unidadProductoId, setUnidadProductoId] = useState(null);
   const [modalDetalleAbierto, setModalDetalleAbierto] = useState(false);
-const [productoDetalle, setProductoDetalle] = useState(null);
-
+  const [productoDetalle, setProductoDetalle] = useState(null);
+  const [activeTab, setActiveTab] = useState("productos");
+  const [unidades, setUnidades] = useState([]);
+  const [busqueda, setBusqueda] = useState("");
 
   const formUnidad = useForm({
     initialValues: {
@@ -92,14 +97,14 @@ const [productoDetalle, setProductoDetalle] = useState(null);
     validate: {
       id_almacen: v => (v.trim().length > 0 ? null : "ID de almacén requerido"),
     },
-    
-  transformValues: (values) => ({
-    ...values,
-   
-    id_almacen: Number(values.id_almacen),
-   
-    cantidad: Number(values.cantidad),
-  }),
+
+    transformValues: values => ({
+      ...values,
+
+      id_almacen: Number(values.id_almacen),
+
+      cantidad: Number(values.cantidad),
+    }),
   });
 
   const form = useForm({
@@ -123,13 +128,21 @@ const [productoDetalle, setProductoDetalle] = useState(null);
     },
   });
 
-  const handleAgregarUnidades = async values => {
-   
-
+  const fetchUnidades = async () => {
     try {
-      const res = await fetch('/api/stock/productos/unidad', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/stock/productos/unidad");
+      const data = await res.json();
+      setUnidades(data);
+    } catch (err) {
+      console.error("Error al obtener unidades:", err);
+    }
+  };
+
+  const handleAgregarUnidades = async values => {
+    try {
+      const res = await fetch("/api/stock/productos/unidad", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id_producto: unidadProductoId,
           ...values,
@@ -140,9 +153,9 @@ const [productoDetalle, setProductoDetalle] = useState(null);
       if (!res.ok) throw new Error(data.message);
 
       notifications.show({
-        title: 'Unidades agregadas',
+        title: "Unidades agregadas",
         message: data.message,
-        color: 'green',
+        color: "green",
       });
 
       setOpenedUnidad(false);
@@ -150,9 +163,9 @@ const [productoDetalle, setProductoDetalle] = useState(null);
       fetchProductos();
     } catch (error) {
       notifications.show({
-        title: 'Error al agregar unidades',
+        title: "Error al agregar unidades",
         message: error.message,
-        color: 'red',
+        color: "red",
       });
     }
   };
@@ -255,7 +268,6 @@ const [productoDetalle, setProductoDetalle] = useState(null);
     }
   };
 
-  console.log("Almacenes:", almacenes);
   const handleEdit = producto => {
     form.setValues({
       ...producto,
@@ -269,21 +281,53 @@ const [productoDetalle, setProductoDetalle] = useState(null);
   useEffect(() => {
     fetchProductos();
     handleObtenerAlmacenes();
+    fetchUnidades();
   }, []);
 
-  const start = (page - 1) * rowsPerPage;
-  const end = start + rowsPerPage;
-  const pageRows = productos.slice(start, end);
+  // Filtrar productos según búsqueda
+  const productosFiltrados = productos.filter(
+    producto =>
+      producto.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      producto.codigo_producto?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      producto.marca.toLowerCase().includes(busqueda.toLowerCase()) ||
+      String(producto.cantidad).includes(busqueda)
+  );
+
+  const startProductos = (pageProductos - 1) * rowsPerPage;
+  const endProductos = startProductos + rowsPerPage;
+  const pageRows = productosFiltrados.slice(startProductos, endProductos);
+
+  // Filtrar unidades según búsqueda
+  const unidadesFiltradas = unidades.filter(
+    unidad =>
+      unidad.nombre_producto.toLowerCase().includes(busqueda.toLowerCase()) ||
+      unidad.numero_serie?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      unidad.nombre_almacen.toLowerCase().includes(busqueda.toLowerCase())
+  );
+
+  const startUnidades = (pageUnidades - 1) * rowsPerPage;
+  const endUnidades = startUnidades + rowsPerPage;
+  const unidadRows = unidadesFiltradas.slice(startUnidades, endUnidades).map((unidad, index) => (
+    <tr key={index}>
+      <td>{unidad.nombre_producto}</td>
+      <td>{unidad.numero_serie}</td>
+      <td>{unidad.nombre_almacen}</td>
+      <td>{unidad.estado}</td>
+      <td>{unidad.observaciones || "-"}</td>
+      <td>{new Date(unidad.fecha_movimiento).toLocaleDateString()}</td>
+    </tr>
+  ));
 
   const handleCardClick = path => {
     window.location.href = path;
   };
 
-  const handleVerDetalle = (producto) => {
-  setProductoDetalle(producto);
-  setModalDetalleAbierto(true);
-};
+  const handleVerDetalle = producto => {
+    setProductoDetalle(producto);
+    setModalDetalleAbierto(true);
+  };
 
+  console.log("Unidades:", unidades);
 
   const rows = pageRows.map((item, index) => (
     <tr align="start" key={index}>
@@ -304,12 +348,9 @@ const [productoDetalle, setProductoDetalle] = useState(null);
               </ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Item
-  leftSection={<IconEye size={14} />}
-  onClick={() => handleVerDetalle(item)}
->
-  Ver detalles
-</Menu.Item>
+              <Menu.Item leftSection={<IconEye size={14} />} onClick={() => handleVerDetalle(item)}>
+                Ver detalles
+              </Menu.Item>
               <Menu.Item
                 leftSection={<IconLibraryPlus size={14} />}
                 onClick={() => {
@@ -389,7 +430,16 @@ const [productoDetalle, setProductoDetalle] = useState(null);
           ))}
 
           <Grid.Col mt={30} span={12}>
-            <TextInput placeholder="Buscar producto..." leftSection={<IconSearch size={18} />} />
+            <TextInput
+              placeholder={`Buscar en ${activeTab === "productos" ? "productos" : "unidades"}...`}
+              value={busqueda}
+              onChange={e => {
+                setBusqueda(e.currentTarget.value);
+                if (activeTab === "productos") setPageProductos(1);
+                if (activeTab === "unidades") setPageUnidades(1);
+              }}
+              leftSection={<IconSearch size={18} />}
+            />
           </Grid.Col>
 
           <Grid.Col span={12}>
@@ -399,36 +449,84 @@ const [productoDetalle, setProductoDetalle] = useState(null);
               </Group>
             ) : (
               <>
-                <Table striped highlightOnHover withRowBorders withColumnBorders>
-                  <thead>
-                    <tr>
-                      <th align="start">Producto</th>
-                      <th align="start">Código</th>
-                      <th align="start">Marca</th>
-                      <th align="start">Proveedor</th>
-                      <th align="start">Stock</th>
-                      <th align="start">Compra</th>
-                      <th align="start">Venta</th>
-                      <th align="start">Ult. Modif.</th>
-                      <th align="start">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>{rows}</tbody>
-                </Table>
-                <Group justify="center" mt="md">
-                  <Pagination
-                    total={Math.ceil(productos.length / rowsPerPage)}
-                    value={page}
-                    onChange={setPage}
-                    color="#ee0e0f"
-                  />
-                </Group>
+                <Tabs
+                  value={activeTab}
+                  onChange={(value) => {
+    setActiveTab(value);
+    setBusqueda(""); // limpiar búsqueda al cambiar de tab
+    if (value === "productos") setPageProductos(1);
+    if (value === "unidades") setPageUnidades(1);
+  }}
+                  mt="xl"
+                  color="#EE0E0F"
+                >
+                  <Tabs.List>
+                    <Tabs.Tab value="productos">Productos</Tabs.Tab>
+                    <Tabs.Tab value="unidades">Unidades</Tabs.Tab>
+                  </Tabs.List>
+
+                  <Tabs.Panel value="productos" pt="md">
+                    <Table striped highlightOnHover withRowBorders withColumnBorders>
+                      <thead>
+                        <tr>
+                          <th align="start">Producto</th>
+                          <th align="start">Código</th>
+                          <th align="start">Marca</th>
+                          <th align="start">Proveedor</th>
+                          <th align="start">Stock</th>
+                          <th align="start">Compra</th>
+                          <th align="start">Venta</th>
+                          <th align="start">Ult. Modif.</th>
+                          <th align="start">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>{rows}</tbody>
+                    </Table>
+                    <Group justify="center" mt="md">
+                      <Pagination
+                        total={Math.ceil(productosFiltrados.length / rowsPerPage)}
+                        value={pageProductos}
+                        onChange={setPageProductos}
+                        color="#ee0e0f"
+                        siblings={1}
+                        boundaries={1}
+                      />
+                    </Group>
+                  </Tabs.Panel>
+
+                  <Tabs.Panel value="unidades" pt="md">
+                    <Table striped highlightOnHover withRowBorders withColumnBorders>
+                      <thead>
+                        <tr>
+                          <th align="start">Producto</th>
+                          <th align="start">N° Serie</th>
+                          <th align="start">Almacén</th>
+                          <th align="start">Estado</th>
+                          <th align="start">Observaciones</th>
+                          <th align="start">Fecha movimiento</th>
+                        </tr>
+                      </thead>
+                      <tbody>{unidadRows}</tbody>
+                    </Table>
+                    <Group justify="center" mt="md">
+                      <Pagination
+                        total={Math.ceil(unidadesFiltradas.length / rowsPerPage)}
+                        defaultValue={pageUnidades}
+                        onChange={setPageUnidades}
+                        color="#ee0e0f"
+                        siblings={1}
+                        boundaries={1}
+                      />
+                    </Group>
+                  </Tabs.Panel>
+                </Tabs>
               </>
             )}
           </Grid.Col>
         </Grid>
-       {// Modal para crear/editar producto
-}
+        {
+          // Modal para crear/editar producto
+        }
         <Modal
           opened={opened}
           onClose={() => {
@@ -533,7 +631,8 @@ const [productoDetalle, setProductoDetalle] = useState(null);
             </Grid>
           </form>
         </Modal>
-        { // Modal para agregar unidades
+        {
+          // Modal para agregar unidades
         }
         <Modal
           opened={openedUnidad}
@@ -574,67 +673,131 @@ const [productoDetalle, setProductoDetalle] = useState(null);
           </form>
         </Modal>
 
-        { // Modal para ver detalles del producto
+        {
+          // Modal para ver detalles del producto
         }
- <Modal
-  opened={modalDetalleAbierto}
-  onClose={() => setModalDetalleAbierto(false)}
-  title="Detalle del producto"
-  size="lg"
-  transitionProps={{ transition: "fade", duration: 200 }}
->
-  {productoDetalle && (
-    <Stack gap="sm">
-      <Group justify="space-between">
-        <Title order={4} c="dimmed">Información general</Title>
-        <Button
-          size="xs"
-          variant="outline"
-          color="#EE0E0F"
-          onClick={() => {
-            setModalDetalleAbierto(false);
-            handleEdit(productoDetalle);
-          }}
+        <Modal
+          opened={modalDetalleAbierto}
+          onClose={() => setModalDetalleAbierto(false)}
+          title="Detalle del producto"
+          size="lg"
+          transitionProps={{ transition: "fade", duration: 200 }}
         >
-          Editar producto
-        </Button>
-      </Group>
+          {productoDetalle && (
+            <Stack gap="sm">
+              <Group justify="space-between">
+                <Title order={4} c="dimmed">
+                  Información general
+                </Title>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  color="#EE0E0F"
+                  onClick={() => {
+                    setModalDetalleAbierto(false);
+                    handleEdit(productoDetalle);
+                  }}
+                >
+                  Editar producto
+                </Button>
+              </Group>
 
-      <Card shadow="sm" padding="md" radius="md" withBorder>
-        <Grid>
-          <Grid.Col span={6}><Text><b>Nombre:</b> {productoDetalle.nombre}</Text></Grid.Col>
-          <Grid.Col span={6}><Text><b>Marca:</b> {productoDetalle.marca}</Text></Grid.Col>
-          <Grid.Col span={6}><Text><b>Modelo:</b> {productoDetalle.modelo || "-"}</Text></Grid.Col>
-          <Grid.Col span={6}><Text><b>Código:</b> {productoDetalle.codigo_producto || "-"}</Text></Grid.Col>
-          <Grid.Col span={12}><Text><b>Descripción:</b> {productoDetalle.descripcion || "-"}</Text></Grid.Col>
-        </Grid>
-      </Card>
+              <Card shadow="sm" padding="md" radius="md" withBorder>
+                <Grid>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Nombre:</b> {productoDetalle.nombre}
+                    </Text>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Marca:</b> {productoDetalle.marca}
+                    </Text>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Modelo:</b> {productoDetalle.modelo || "-"}
+                    </Text>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Código:</b> {productoDetalle.codigo_producto || "-"}
+                    </Text>
+                  </Grid.Col>
+                  <Grid.Col span={12}>
+                    <Text>
+                      <b>Descripción:</b> {productoDetalle.descripcion || "-"}
+                    </Text>
+                  </Grid.Col>
+                </Grid>
+              </Card>
 
-      <Title order={4} c="dimmed" mt="md">Datos comerciales</Title>
-      <Card shadow="sm" padding="md" radius="md" withBorder>
-        <Grid>
-          <Grid.Col span={6}><Text><b>Categoría:</b> {productoDetalle.categoria}</Text></Grid.Col>
-          <Grid.Col span={6}><Text><b>Tipo envío:</b> {productoDetalle.tipo_envio || "-"}</Text></Grid.Col>
-          <Grid.Col span={6}><Text><b>Plazo de entrega:</b> {productoDetalle.plazo_entrega || "-"}</Text></Grid.Col>
-          <Grid.Col span={6}><Text><b>Garantía:</b> {productoDetalle.garantia || "-"}</Text></Grid.Col>
-          <Grid.Col span={6}><Text><b>Precio de compra:</b> ${parseFloat(productoDetalle.precio_compra).toLocaleString()}</Text></Grid.Col>
-          <Grid.Col span={6}><Text><b>Precio de venta:</b> ${parseFloat(productoDetalle.precio_venta).toLocaleString()}</Text></Grid.Col>
-        </Grid>
-      </Card>
+              <Title order={4} c="dimmed" mt="md">
+                Datos comerciales
+              </Title>
+              <Card shadow="sm" padding="md" radius="md" withBorder>
+                <Grid>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Categoría:</b> {productoDetalle.categoria}
+                    </Text>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Tipo envío:</b> {productoDetalle.tipo_envio || "-"}
+                    </Text>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Plazo de entrega:</b> {productoDetalle.plazo_entrega || "-"}
+                    </Text>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Garantía:</b> {productoDetalle.garantia || "-"}
+                    </Text>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Precio de compra:</b> $
+                      {parseFloat(productoDetalle.precio_compra).toLocaleString()}
+                    </Text>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Precio de venta:</b> $
+                      {parseFloat(productoDetalle.precio_venta).toLocaleString()}
+                    </Text>
+                  </Grid.Col>
+                </Grid>
+              </Card>
 
-      <Title order={4} c="dimmed" mt="md">Otros datos</Title>
-      <Card shadow="sm" padding="md" radius="md" withBorder>
-        <Grid>
-          <Grid.Col span={6}><Text><b>Stock actual:</b> {productoDetalle.cantidad}</Text></Grid.Col>
-          <Grid.Col span={6}><Text><b>Proveedores:</b> {productoDetalle.proveedores || "-"}</Text></Grid.Col>
-          <Grid.Col span={12}><Text><b>Última modificación:</b> {new Date(productoDetalle.ultima_modificacion).toLocaleDateString()}</Text></Grid.Col>
-        </Grid>
-      </Card>
-    </Stack>
-  )}
-</Modal>
-
-
+              <Title order={4} c="dimmed" mt="md">
+                Otros datos
+              </Title>
+              <Card shadow="sm" padding="md" radius="md" withBorder>
+                <Grid>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Stock actual:</b> {productoDetalle.cantidad}
+                    </Text>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Text>
+                      <b>Proveedores:</b> {productoDetalle.proveedores || "-"}
+                    </Text>
+                  </Grid.Col>
+                  <Grid.Col span={12}>
+                    <Text>
+                      <b>Última modificación:</b>{" "}
+                      {new Date(productoDetalle.ultima_modificacion).toLocaleDateString()}
+                    </Text>
+                  </Grid.Col>
+                </Grid>
+              </Card>
+            </Stack>
+          )}
+        </Modal>
       </Container>
     </LayoutBase>
   );

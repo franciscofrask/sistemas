@@ -52,7 +52,7 @@ export default function BreadcrumbsNav({
 
 
         {item.title}
-        {console.log(currentColor)}
+        
       </Anchor>
     );
   });
