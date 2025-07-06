@@ -21,7 +21,7 @@ import { notifications } from "@mantine/notifications";
 
 const rowsPerPage = 5;
 
-const index = () => {
+const Clientes = () => {
   const [clientes, setClientes] = useState([]);
   const [opened, setOpened] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(false);
@@ -250,4 +250,4 @@ const index = () => {
   );
 };
 
-export default index;
+export default Clientes;

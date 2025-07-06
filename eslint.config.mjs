@@ -20,9 +20,9 @@ const eslintConfig = [
     rules: {
       "no-unused-vars": "warn",
       "no-console": "off",
-      "react/jsx-key": "warn",
-      "semi": ["error", "always"],
-      "quotes": ["error", "double"],
+
+     
+      
     },
   },
 ];

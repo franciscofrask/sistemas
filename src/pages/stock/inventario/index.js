@@ -69,7 +69,7 @@ const items = [
   },
 ];
 
-const Index = () => {
+const Inventario = () => {
   const [pageProductos, setPageProductos] = useState(1);
   const [pageUnidades, setPageUnidades] = useState(1);
   const [opened, setOpened] = useState(false);
@@ -803,4 +803,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default Inventario;
