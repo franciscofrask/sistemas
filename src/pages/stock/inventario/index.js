@@ -25,6 +25,7 @@ import {
 } from "@mantine/core";
 import BreadcrumbsNav from "@/components/Breadcrums";
 import { notifications } from "@mantine/notifications";
+
 import { useForm } from "@mantine/form";
 import {
   IconStackMiddle,
@@ -376,15 +377,7 @@ const Inventario = () => {
   return (
     <LayoutBase>
       <Container size="lg" >
-        <BreadcrumbsNav
-          items={[
-            { title: "Inicio", href: "/" },
-            { title: "inventario", href: "/stock" },
-          ]}
-          separator="/"
-          separatorColor="#EE0E0F"
-          currentColor="#EE0E0F"
-        />
+       
         <Grid mt={20}>
           <Grid.Col span={12}>
             <Title order={1}>Inventario</Title>
@@ -631,9 +624,7 @@ const Inventario = () => {
             </Grid>
           </form>
         </Modal>
-        {
-          // Modal para agregar unidades
-        }
+     
         <Modal
           opened={openedUnidad}
           onClose={() => {

@@ -124,12 +124,7 @@ const Clientes = () => {
   return (
     <LayoutBase>
       <Container size="lg">
-        <BreadcrumbsNav
-          items={[{ title: "Inicio", href: "/" }, { title: "Clientes", href: "/stock/clientes" }]}
-          separator="/"
-          separatorColor="#EE0E0F"
-          currentColor="#EE0E0F"
-        />
+      
 
         <Grid mt={20}>
           <Grid.Col span={12}>

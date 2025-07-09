@@ -22,6 +22,8 @@ import { useForm } from "@mantine/form";
 import { IconPencil, IconPlus, IconTrash, IconSearch } from "@tabler/icons-react";
 import BreadcrumbsNav from "@/components/Breadcrums";
 import { notifications } from "@mantine/notifications";
+import { useRouter } from 'next/router';
+
 
 const rowsPerPage = 5;
 
@@ -33,6 +35,8 @@ export default function AlmacenesPage() {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [almacenEditando, setAlmacenEditando] = useState(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
 
   const form = useForm({
     initialValues: {
@@ -92,26 +96,7 @@ export default function AlmacenesPage() {
     }
   };
 
-  const handleDelete = async id => {
-    if (!confirm("¿Estás seguro que deseas eliminar este almacén?")) return;
-    try {
-      const res = await fetch(`/api/stock/almacenes/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
 
-      notifications.show({ title: "Almacén eliminado", message: data.message, color: "green" });
-      fetchAlmacenes();
-    } catch (error) {
-      notifications.show({ title: "Error", message: error.message, color: "red" });
-    }
-  };
-
-  const handleEdit = almacen => {
-    form.setValues(almacen);
-    setModoEdicion(true);
-    setAlmacenEditando(almacen.id_almacen);
-    setOpened(true);
-  };
 
   const almacenesFiltrados = almacenes.filter(a =>
     a.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -148,15 +133,19 @@ export default function AlmacenesPage() {
 
         <Grid mt={20}>
           <Grid.Col span={12}>
-            <Title order={1}>Almacenes</Title>
-            <Text c="dimmed" order={4}>Gestión de almacenes físicos disponibles</Text>
+            <Title order={1}>Presupuestos</Title>
+            <Text c="dimmed" order={4}>Cree y envíe presupuestos personalizados a sus clientes  </Text>
           </Grid.Col>
 
-          <Grid.Col span={12}>
-            <Button variant="outline" color="#EE0E0F" onClick={() => setOpened(true)} >
-              Crear Almacén
-            </Button>
-          </Grid.Col>
+        <Grid.Col span={12}>
+  <Button
+    variant="outline"
+    color="#EE0E0F"
+    onClick={() => router.push('/stock/presupuestos/crearpresupuesto')}
+  >
+    Crear Presupuesto
+  </Button>
+</Grid.Col>
 
           <Grid.Col mt={30} span={12}>
             <TextInput
@@ -189,8 +178,15 @@ export default function AlmacenesPage() {
                   <tbody>{rows}</tbody>
                 </Table>
 
-                <Group justify="center" mt="md">
+               
+              </>
+            )}
+          </Grid.Col>
+          
+        </Grid>
+ <Group justify="center" mt="md">
                   <Pagination
+                  
                     total={Math.ceil(almacenesFiltrados.length / rowsPerPage)}
                     value={page}
                     onChange={setPage}
@@ -199,11 +195,6 @@ export default function AlmacenesPage() {
                     boundaries={1}
                   />
                 </Group>
-              </>
-            )}
-          </Grid.Col>
-        </Grid>
-
         <Modal
           opened={opened}
           onClose={() => {

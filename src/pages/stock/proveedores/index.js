@@ -126,12 +126,7 @@ const Proveedores = () => {
   return (
     <LayoutBase>
       <Container size="lg">
-        <BreadcrumbsNav
-          items={[{ title: "Inicio", href: "/" }, { title: "proveedores", href: "/stock/proveedores" }]}
-          separator="/"
-          separatorColor="#EE0E0F"
-          currentColor="#EE0E0F"
-        />
+        
 
         <Grid mt={20}>
           <Grid.Col span={12}>
