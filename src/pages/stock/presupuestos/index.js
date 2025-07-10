@@ -18,42 +18,24 @@ import {
   Pagination,
   Loader,
 } from "@mantine/core";
-import { useForm } from "@mantine/form";
 import { IconPencil, IconPlus, IconTrash, IconSearch } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { useRouter } from 'next/router';
 
-
 const rowsPerPage = 5;
 
-export default function AlmacenesPage() {
-  const [almacenes, setAlmacenes] = useState([]);
+export default function PresupuestosPage() {
+  const [presupuestos, setPresupuestos] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
-  const [opened, setOpened] = useState(false);
-  const [modoEdicion, setModoEdicion] = useState(false);
-  const [almacenEditando, setAlmacenEditando] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-
-  const form = useForm({
-    initialValues: {
-      nombre: "",
-      ubicacion: "",
-      descripcion: "",
-    },
-    validate: {
-      nombre: value => (value.length < 2 ? "El nombre es obligatorio" : null),
-      ubicacion: value => (value.length < 2 ? "La ubicación es obligatoria" : null),
-    },
-  });
-
-  const fetchAlmacenes = async () => {
+  const fetchPresupuestos = async () => {
     try {
-      const res = await fetch("/api/stock/almacenes");
+      const res = await fetch("/api/stock/presupuestos/detallado");
       const data = await res.json();
-      setAlmacenes(data);
+      setPresupuestos(data);
     } catch (error) {
       notifications.show({ title: "Error", message: error.message, color: "red" });
     } finally {
@@ -62,62 +44,47 @@ export default function AlmacenesPage() {
   };
 
   useEffect(() => {
-    fetchAlmacenes();
+    fetchPresupuestos();
   }, []);
 
-  const handleSubmit = async values => {
+  const handleDelete = async (id) => {
     try {
-      const method = modoEdicion ? "PUT" : "POST";
-      const url = modoEdicion ? `/api/stock/almacenes/${almacenEditando}` : "/api/stock/almacenes";
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+      const res = await fetch(`/api/stock/presupuestos/${id}`, {
+        method: 'DELETE'
       });
-
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      if (!res.ok) throw new Error(data.error);
 
-      notifications.show({
-        title: modoEdicion ? "Almacén actualizado" : "Almacén creado",
-        message: data.message,
-        color: "green",
-      });
-
-      fetchAlmacenes();
-      form.reset();
-      setModoEdicion(false);
-      setAlmacenEditando(null);
-      setOpened(false);
+      notifications.show({ title: "Presupuesto eliminado", message: data.mensaje, color: "green" });
+      fetchPresupuestos();
     } catch (error) {
       notifications.show({ title: "Error", message: error.message, color: "red" });
     }
   };
 
-
-
-  const almacenesFiltrados = almacenes.filter(a =>
-    a.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    a.ubicacion.toLowerCase().includes(busqueda.toLowerCase()) ||
-    (a.descripcion || "").toLowerCase().includes(busqueda.toLowerCase())
+  const presupuestosFiltrados = presupuestos.filter(p =>
+    p.numero_presupuesto.toLowerCase().includes(busqueda.toLowerCase()) ||
+    p.cliente.toLowerCase().includes(busqueda.toLowerCase()) ||
+    (p.observaciones || "").toLowerCase().includes(busqueda.toLowerCase())
   );
 
   const start = (page - 1) * rowsPerPage;
   const end = start + rowsPerPage;
-  const pageRows = almacenesFiltrados.slice(start, end);
+  const pageRows = presupuestosFiltrados.slice(start, end);
 
-  const rows = pageRows.map((a, index) => (
-    <tr justify={"flex-start"} align={"flex-start"} key={index}>
-      <td>{a.nombre}</td>
-      <td>{a.ubicacion}</td>
-      <td>{a.descripcion || "-"}</td>
+  const rows = pageRows.map((p, index) => (
+    <tr key={index}>
+      <td>{p.numero_presupuesto}</td>
+      <td>{p.fecha}</td>
+      <td>{p.cliente}</td>
+     <td>{p.moneda} ${Number(p.total).toFixed(2)}</td>
+      <td>{p.estado}</td>
       <td>
         <Group gap="xs">
-          <ActionIcon color="blue" variant="subtle" onClick={() => handleEdit(a)}>
+          <ActionIcon color="blue" variant="subtle" onClick={() => router.push(`/stock/presupuestos/crearpresupuesto?id=${p.id_presupuesto}`)}>
             <IconPencil size={16} />
           </ActionIcon>
-          <ActionIcon color="red" variant="subtle" onClick={() => handleDelete(a.id_almacen)}>
+          <ActionIcon color="red" variant="subtle" onClick={() => handleDelete(p.id_presupuesto)}>
             <IconTrash size={16} />
           </ActionIcon>
         </Group>
@@ -128,27 +95,25 @@ export default function AlmacenesPage() {
   return (
     <LayoutBase>
       <Container size="lg">
-       
-
         <Grid mt={20}>
           <Grid.Col span={12}>
             <Title order={1}>Presupuestos</Title>
-            <Text c="dimmed" order={4}>Cree y envíe presupuestos personalizados a sus clientes  </Text>
+            <Text c="dimmed">Cree y administre presupuestos para sus clientes</Text>
           </Grid.Col>
 
-        <Grid.Col span={12}>
-  <Button
-    variant="outline"
-    color="#EE0E0F"
-    onClick={() => router.push('/stock/presupuestos/crearpresupuesto')}
-  >
-    Crear Presupuesto
-  </Button>
-</Grid.Col>
+          <Grid.Col span={12}>
+            <Button
+              variant="outline"
+              color="#EE0E0F"
+              onClick={() => router.push('/stock/presupuestos/crearpresupuesto')}
+            >
+              Crear Presupuesto
+            </Button>
+          </Grid.Col>
 
           <Grid.Col mt={30} span={12}>
             <TextInput
-              placeholder="Buscar por nombre, ubicación o descripción..."
+              placeholder="Buscar por número, cliente u observaciones..."
               value={busqueda}
               onChange={e => {
                 setBusqueda(e.currentTarget.value);
@@ -168,57 +133,31 @@ export default function AlmacenesPage() {
                 <Table striped highlightOnHover withRowBorders withColumnBorders>
                   <thead>
                     <tr>
-                      <th align="start">Nombre</th>
-                      <th align="start">Ubicación</th>
-                      <th align="start">Descripción</th>
-                      <th align="start">Acciones</th>
+                      <th>Número</th>
+                      <th>Fecha</th>
+                      <th>Cliente</th>
+                      <th>Total</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>{rows}</tbody>
                 </Table>
-
-               
               </>
             )}
           </Grid.Col>
-          
+
+          <Group justify="center" mt="md">
+            <Pagination
+              total={Math.ceil(presupuestosFiltrados.length / rowsPerPage)}
+              value={page}
+              onChange={setPage}
+              color="#ee0e0f"
+              siblings={0}
+              boundaries={1}
+            />
+          </Group>
         </Grid>
- <Group justify="center" mt="md">
-                  <Pagination
-                  
-                    total={Math.ceil(almacenesFiltrados.length / rowsPerPage)}
-                    value={page}
-                    onChange={setPage}
-                    color="#ee0e0f"
-                    siblings={0}
-                    boundaries={1}
-                  />
-                </Group>
-        <Modal
-          opened={opened}
-          onClose={() => {
-            setOpened(false);
-            form.reset();
-            setModoEdicion(false);
-            setAlmacenEditando(null);
-          }}
-          title={modoEdicion ? "Editar Almacén" : "Crear Almacén"}
-          size="sm"
-        >
-          <form onSubmit={form.onSubmit(handleSubmit)}>
-            <Stack>
-              <TextInput label="Nombre" {...form.getInputProps("nombre")} required />
-              <TextInput label="Ubicación" {...form.getInputProps("ubicacion")} required />
-              <TextInput label="Descripción" {...form.getInputProps("descripcion")} />
-              <Button type="submit" fullWidth variant="outline" color="#EE0E0F">
-                {modoEdicion ? "Guardar cambios" : "Crear Almacén"}
-              </Button>
-            </Stack>
-          </form>
-        </Modal>
-
-
-        
       </Container>
     </LayoutBase>
   );
