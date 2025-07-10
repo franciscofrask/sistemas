@@ -58,12 +58,31 @@ export default async function handler(req, res) {
     }
   }
 
-  if (req.method === 'GET') {
-    const [rows] = await db.query('SELECT * FROM vista_productos_con_stock');
+ if (req.method === 'GET') {
+  const { nombre } = req.query;
+
+  try {
+    let rows;
+
+    if (nombre) {
+      const [result] = await db.query(
+        'SELECT * FROM vista_productos_con_stock WHERE nombre LIKE ?',
+      [`%${nombre}%`]
+
+      );
+      rows = result;
+    } else {
+      const [result] = await db.query('SELECT * FROM vista_productos_con_stock');
+      rows = result;
+    }
+
     return res.status(200).json(rows);
+
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
+}
 
   
-
   res.status(405).json({ message: 'Método no permitido' });
 }

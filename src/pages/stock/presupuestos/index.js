@@ -20,7 +20,6 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { IconPencil, IconPlus, IconTrash, IconSearch } from "@tabler/icons-react";
-import BreadcrumbsNav from "@/components/Breadcrums";
 import { notifications } from "@mantine/notifications";
 import { useRouter } from 'next/router';
 
@@ -217,6 +216,9 @@ export default function AlmacenesPage() {
             </Stack>
           </form>
         </Modal>
+
+
+        
       </Container>
     </LayoutBase>
   );
