@@ -20,7 +20,7 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { IconPencil, IconPlus, IconTrash, IconSearch } from "@tabler/icons-react";
-import BreadcrumbsNav from "@/components/Breadcrums";
+
 import { notifications } from "@mantine/notifications";
 
 const rowsPerPage = 5;
@@ -50,7 +50,7 @@ export default function AlmacenesPage() {
     try {
       const res = await fetch("/api/stock/almacenes");
       const data = await res.json();
-      setAlmacenes(data);
+      setAlmacenes(Array.isArray(data)? data: []);
     } catch (error) {
       notifications.show({ title: "Error", message: error.message, color: "red" });
     } finally {

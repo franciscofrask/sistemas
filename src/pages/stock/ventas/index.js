@@ -8,6 +8,7 @@ import {
   Container,
   Grid,
   Group,
+  Stack,
   Text,
   TextInput,
   Title,
@@ -16,10 +17,8 @@ import {
   ActionIcon,
   Pagination,
   Loader,
-  Stack,
-  Divider,
 } from "@mantine/core";
-import { IconEye, IconTrash, IconSearch } from "@tabler/icons-react";
+import { IconPencil, IconPlus, IconTrash, IconSearch } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { useRouter } from 'next/router';
 
@@ -30,8 +29,6 @@ export default function PresupuestosPage() {
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [detalle, setDetalle] = useState(null);
-  const [modalAbierto, setModalAbierto] = useState(false);
   const router = useRouter();
 
   const fetchPresupuestos = async () => {
@@ -43,17 +40,6 @@ export default function PresupuestosPage() {
       notifications.show({ title: "Error", message: error.message, color: "red" });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchDetallePresupuesto = async (id) => {
-    try {
-      const res = await fetch(`/api/stock/presupuestos/${id}`);
-      const data = await res.json();
-      setDetalle(data);
-      setModalAbierto(true);
-    } catch (error) {
-      notifications.show({ title: "Error", message: "No se pudo cargar el detalle", color: "red" });
     }
   };
 
@@ -91,12 +77,12 @@ export default function PresupuestosPage() {
       <td>{p.numero_presupuesto}</td>
       <td>{p.fecha}</td>
       <td>{p.cliente}</td>
-      <td>{p.moneda} ${Number(p.total).toFixed(2)}</td>
+     <td>{p.moneda} ${Number(p.total).toFixed(2)}</td>
       <td>{p.estado}</td>
       <td>
         <Group gap="xs">
-          <ActionIcon color="blue" variant="subtle" onClick={() => fetchDetallePresupuesto(p.id_presupuesto)}>
-            <IconEye size={16} />
+          <ActionIcon color="blue" variant="subtle" onClick={() => router.push(`/stock/presupuestos/crearpresupuesto?id=${p.id_presupuesto}`)}>
+            <IconPencil size={16} />
           </ActionIcon>
           <ActionIcon color="red" variant="subtle" onClick={() => handleDelete(p.id_presupuesto)}>
             <IconTrash size={16} />
@@ -109,10 +95,11 @@ export default function PresupuestosPage() {
   return (
     <LayoutBase>
       <Container size="lg">
+        <Title>Componente en desarrollo</Title>
         <Grid mt={20}>
           <Grid.Col span={12}>
-            <Title order={1}>Presupuestos</Title>
-            <Text c="dimmed">Cree y administre presupuestos para sus clientes</Text>
+            <Title order={1}>Ventas</Title>
+            <Text c="dimmed">Cree y administre ventas</Text>
           </Grid.Col>
 
           <Grid.Col span={12}>
@@ -121,7 +108,7 @@ export default function PresupuestosPage() {
               color="#EE0E0F"
               onClick={() => router.push('/stock/ventas/crearventa')}
             >
-              Crear Presupuesto
+              Crear Venta
             </Button>
           </Grid.Col>
 
@@ -147,17 +134,21 @@ export default function PresupuestosPage() {
                 <Table striped highlightOnHover withRowBorders withColumnBorders>
                   <thead>
                     <tr>
-                      <th align="start">Número</th>
-                      <th align="start">Fecha</th>
-                      <th align="start">Cliente</th>
-                      <th align="start">Total</th>
-                      <th align="start">Estado</th>
-                      <th align="start">Acciones</th>
+                      <th>Número</th>
+                      <th>Fecha</th>
+                      <th>Cliente</th>
+                      <th>Total</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>{rows}</tbody>
                 </Table>
-                 <Group  justify="center" mt="md">
+              </>
+            )}
+          </Grid.Col>
+
+          <Group justify="center" mt="md">
             <Pagination
               total={Math.ceil(presupuestosFiltrados.length / rowsPerPage)}
               value={page}
@@ -167,83 +158,7 @@ export default function PresupuestosPage() {
               boundaries={1}
             />
           </Group>
-              </>
-            )}
-          </Grid.Col>
-
-         
         </Grid>
-
-        <Modal
-          opened={modalAbierto}
-          onClose={() => setModalAbierto(false)}
-          title={`Detalle del Presupuesto Nº ${detalle?.numero_presupuesto || ''}`}
-          size="lg"
-          centered
-          scrollArea="inside"
-        >
-          {detalle ? (
-            <Stack>
-              <Card withBorder shadow="sm">
-                <Title order={4}>Información General</Title>
-                <Text>Fecha: {detalle.fecha}</Text>
-                <Text>Vencimiento: {detalle.fecha_vencimiento}</Text>
-                <Text>Estado: {detalle.estado}</Text>
-                <Text>Forma de Pago: {detalle.forma_pago}</Text>
-                <Text>Moneda: {detalle.moneda}</Text>
-              </Card>
-
-              <Card withBorder shadow="sm">
-                <Title order={4}>Cliente</Title>
-                <Text>Nombre: {detalle.cliente.nombre}</Text>
-                <Text>Teléfono: {detalle.cliente.telefono}</Text>
-              </Card>
-
-              <Card withBorder shadow="sm">
-                <Title order={4}>Vendedor</Title>
-                <Text>{detalle.vendedor.nombre}</Text>
-              </Card>
-
-              <Card withBorder shadow="sm">
-                <Title order={4}>Productos</Title>
-                <Table withBorder withColumnBorders>
-                  <thead>
-                    <tr>
-                      <th>Producto</th>
-                      <th>Marca</th>
-                      <th>Modelo</th>
-                      <th>Cantidad</th>
-                      <th>Precio Unitario</th>
-                      <th>Subtotal</th>
-                    </tr>
-                  </thead>
-                 <tbody>
-  {detalle.productos.map((prod, idx) => (
-    <tr key={idx}>
-      <td>{prod.nombre}</td>
-      <td>{prod.marca}</td>
-      <td>{prod.modelo}</td>
-      <td>{prod.cantidad}</td>
-      <td>${Number(prod.precio_unitario).toFixed(2)}</td>
-      <td>${Number(prod.subtotal).toFixed(2)}</td>
-    </tr>
-  ))}
-</tbody>
-                </Table>
-              </Card>
-
-              <Card withBorder shadow="sm">
-                <Title order={4}>Resumen</Title>
-                <Text>Descuento: -${Number(detalle.descuento).toFixed(2)}</Text>
-                <Text>Impuestos: +${Number(detalle.impuestos).toFixed(2)}</Text>
-                <Text fw={700}>Total: ${Number(detalle.total).toFixed(2)}</Text>
-              </Card>
-            </Stack>
-          ) : (
-            <Text>Cargando datos...</Text>
-          )}
-        </Modal>
-
       </Container>
     </LayoutBase>
   );

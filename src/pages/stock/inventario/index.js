@@ -133,7 +133,7 @@ const Inventario = () => {
     try {
       const res = await fetch("/api/stock/productos/unidad");
       const data = await res.json();
-      setUnidades(data);
+      setUnidades(Array.isArray(data)? data: []);
     } catch (err) {
       console.error("Error al obtener unidades:", err);
     }
@@ -175,7 +175,7 @@ const Inventario = () => {
     try {
       const res = await fetch("/api/stock/productos");
       const data = await res.json();
-      setProductos(data);
+      setProductos(Array.isArray(data)? data: []);
     } catch (err) {
       console.error("Error al obtener productos:", err);
     } finally {
@@ -286,13 +286,15 @@ const Inventario = () => {
   }, []);
 
   // Filtrar productos según búsqueda
-  const productosFiltrados = productos.filter(
-    producto =>
-      producto.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      producto.codigo_producto?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      producto.marca.toLowerCase().includes(busqueda.toLowerCase()) ||
-      String(producto.cantidad).includes(busqueda)
-  );
+ const productosFiltrados = Array.isArray(productos)
+  ? productos.filter(
+      producto =>
+        producto.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        producto.codigo_producto?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        producto.marca.toLowerCase().includes(busqueda.toLowerCase()) ||
+        String(producto.cantidad).includes(busqueda)
+    )
+  : [];
 
   const startProductos = (pageProductos - 1) * rowsPerPage;
   const endProductos = startProductos + rowsPerPage;
@@ -642,14 +644,18 @@ const Inventario = () => {
                 {...formUnidad.getInputProps("numero_serie")}
               />
               <Select
-                label="Almacén"
-                placeholder="Seleccione un almacén"
-                data={almacenes.map(almacen => ({
-                  value: String(almacen.id_almacen),
-                  label: almacen.nombre,
-                }))}
-                {...formUnidad.getInputProps("id_almacen")}
-              />
+  label="Almacén"
+  placeholder="Seleccione un almacén"
+  data={
+    Array.isArray(almacenes)
+      ? almacenes.map(almacen => ({
+          value: String(almacen.id_almacen),
+          label: almacen.nombre,
+        }))
+      : []
+  }
+  {...formUnidad.getInputProps("id_almacen")}
+/>
               <Textarea
                 label="Observaciones"
                 autosize

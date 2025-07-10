@@ -19,7 +19,6 @@ import {
 import { LayoutBase } from "@/layouts";
 import { useForm } from "@mantine/form";
 import { IconSearch, IconSettings, IconTrash, IconPencil } from "@tabler/icons-react";
-import BreadcrumbsNav from "@/components/Breadcrums";
 import { notifications } from "@mantine/notifications";
 
 const rowsPerPage = 5;

@@ -4,6 +4,7 @@ import { Notifications } from '@mantine/notifications';
 import { MantineProvider } from '@mantine/core';
 // ‼️ import notifications styles after core package styles
 import '@mantine/notifications/styles.css';
+import '@mantine/dates/styles.css';
 
 export default function App({ Component, pageProps }) {
 

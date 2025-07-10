@@ -77,5 +77,55 @@ export default async function handler(req, res) {
     }
   }
 
+  if (req.method === 'GET') {
+  try {
+    const [rows] = await db.query(
+      `SELECT * FROM vista_presupuestos_detallado WHERE id_presupuesto = ?`,
+      [parseInt(id)]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Presupuesto no encontrado' });
+    }
+
+    const presupuesto = {
+      id_presupuesto: rows[0].id_presupuesto,
+      numero_presupuesto: rows[0].numero_presupuesto,
+      fecha: rows[0].fecha,
+      fecha_vencimiento: rows[0].fecha_vencimiento,
+      estado: rows[0].estado,
+      moneda: rows[0].moneda,
+      forma_pago: rows[0].forma_pago,
+      total: rows[0].total,
+      descuento: rows[0].descuento,
+      impuestos: rows[0].impuestos,
+      observaciones: rows[0].observaciones,
+      cliente: {
+        id_cliente: rows[0].id_cliente,
+        nombre: rows[0].cliente,
+        telefono: rows[0].telefono_cliente
+      },
+      vendedor: {
+        id_vendedor: rows[0].id_vendedor,
+        nombre: rows[0].vendedor
+      },
+      productos: rows.map(row => ({
+        id_producto: row.id_producto,
+        nombre: row.producto,
+        marca: row.marca,
+        modelo: row.modelo,
+        cantidad: row.cantidad,
+        precio_unitario: row.precio_unitario,
+        subtotal: row.subtotal_item
+      }))
+    };
+
+    return res.status(200).json(presupuesto);
+  } catch (error) {
+    console.error('Error al obtener presupuesto:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
   return res.status(405).json({ error: 'Método no permitido' });
 }

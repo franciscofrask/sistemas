@@ -16,7 +16,6 @@ import {
 import { LayoutBase } from "@/layouts";
 import { useForm } from "@mantine/form";
 import { IconSearch, IconTrash, IconPencil } from "@tabler/icons-react";
-import BreadcrumbsNav from "@/components/Breadcrums";
 import { notifications } from "@mantine/notifications";
 
 const rowsPerPage = 5;
@@ -50,7 +49,7 @@ const Clientes = () => {
     try {
       const res = await fetch("/api/stock/clientes");
       const data = await res.json();
-      setClientes(data);
+      setClientes(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error al obtener clientes:", err);
     }
