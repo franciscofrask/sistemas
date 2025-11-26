@@ -5,13 +5,19 @@ import { MantineProvider } from '@mantine/core';
 // ‼️ import notifications styles after core package styles
 import '@mantine/notifications/styles.css';
 import '@mantine/dates/styles.css';
+import { SessionProvider } from "next-auth/react";
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 export default function App({ Component, pageProps }) {
 
   return(
      <MantineProvider>
        <Notifications />
-      <Component {...pageProps} />
+       <ErrorBoundary>
+         <SessionProvider session={pageProps.session}>
+           <Component {...pageProps} />
+         </SessionProvider>
+       </ErrorBoundary>
       </MantineProvider>
   )
  

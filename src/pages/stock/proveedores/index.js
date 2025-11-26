@@ -20,6 +20,8 @@ import { LayoutBase } from "@/layouts";
 import { useForm } from "@mantine/form";
 import { IconSearch, IconSettings, IconTrash, IconPencil } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
+import { apiCall, showErrorNotification, showSuccessNotification } from "@/utils/errorHandler";
+import { useSafeAsync } from "@/hooks/useErrorHandler";
 
 const rowsPerPage = 5;
 
@@ -31,6 +33,9 @@ const Proveedores = () => {
   const [proveedorEditandoId, setProveedorEditandoId] = useState(null);
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
+  
+  // Hook para operaciones async seguras
+  const { executeAsync } = useSafeAsync();
 
   const form = useForm({
     initialValues: {
@@ -47,45 +52,47 @@ const Proveedores = () => {
   });
 
   const fetchProveedores = async () => {
-    try {
-      const res = await fetch("/api/stock/proveedores");
-      const data = await res.json();
-      setProveedores(data);
-    } catch (err) {
-      console.error("Error al obtener proveedores:", err);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true);
+    const response = await executeAsync(
+      async () => {
+        const result = await apiCall("/api/stock/proveedores");
+        return result.success ? (Array.isArray(result.data) ? result.data : result) : [];
+      }
+    );
+    
+    setProveedores(Array.isArray(response) ? response : []);
+    setLoading(false);
   };
 
   const handleSubmit = async values => {
-    try {
-      const method = modoEdicion ? "PUT" : "POST";
-      const url = modoEdicion
-        ? `/api/stock/proveedores/${proveedorEditandoId}`
-        : `/api/stock/proveedores`;
+    const result = await executeAsync(
+      async () => {
+        const method = modoEdicion ? "PUT" : "POST";
+        const url = modoEdicion
+          ? `/api/stock/proveedores/${proveedorEditandoId}`
+          : `/api/stock/proveedores`;
 
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+        const data = await apiCall(url, {
+          method,
+          body: JSON.stringify(values),
+        });
 
-      notifications.show({
-        title: modoEdicion ? "Proveedor actualizado" : "Proveedor creado",
-        message: data.message,
-        color: "green",
-      });
+        showSuccessNotification(
+          data.message || (modoEdicion ? "Proveedor actualizado correctamente" : "Proveedor creado correctamente"),
+          modoEdicion ? "Proveedor actualizado" : "Proveedor creado"
+        );
 
+        return true;
+      },
+      "Error al guardar proveedor"
+    );
+
+    if (result) {
       setOpened(false);
       setModoEdicion(false);
       setProveedorEditandoId(null);
       form.reset();
       fetchProveedores();
-    } catch (err) {
-      notifications.show({ title: "Error", message: err.message, color: "red" });
     }
   };
 
@@ -97,16 +104,22 @@ const Proveedores = () => {
   };
 
   const handleDelete = async id => {
-    if (!confirm("Estás seguro de eliminar este proveedor?")) return;
-    try {
-      const res = await fetch(`/api/stock/proveedores/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+    if (!confirm("¿Está seguro de eliminar este proveedor?")) return;
+    
+    const result = await executeAsync(
+      async () => {
+        const data = await apiCall(`/api/stock/proveedores/${id}`, { method: "DELETE" });
+        showSuccessNotification(
+          data.message || "Proveedor eliminado correctamente", 
+          "Proveedor eliminado"
+        );
+        return true;
+      },
+      "Error al eliminar proveedor"
+    );
 
-      notifications.show({ title: "Proveedor eliminado", message: data.message, color: "green" });
+    if (result) {
       fetchProveedores();
-    } catch (err) {
-      notifications.show({ title: "Error", message: err.message, color: "red" });
     }
   };
 

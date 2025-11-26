@@ -25,6 +25,8 @@ import {
 } from "@mantine/core";
 
 import { notifications } from "@mantine/notifications";
+import { apiCall, showErrorNotification, showSuccessNotification } from "@/utils/errorHandler";
+import { useSafeAsync } from "@/hooks/useErrorHandler";
 
 import { useForm } from "@mantine/form";
 import {
@@ -88,6 +90,9 @@ const Inventario = () => {
   const [unidades, setUnidades] = useState([]);
   const [busqueda, setBusqueda] = useState("");
 
+  // Hook para operaciones async seguras
+  const { executeAsync } = useSafeAsync();
+
   const formUnidad = useForm({
     initialValues: {
       numero_serie: "",
@@ -130,57 +135,50 @@ const Inventario = () => {
   });
 
   const fetchUnidades = async () => {
-    try {
-      const res = await fetch("/api/stock/productos/unidad");
-      const data = await res.json();
-      setUnidades(Array.isArray(data)? data: []);
-    } catch (err) {
-      console.error("Error al obtener unidades:", err);
-    }
+    const response = await executeAsync(
+      async () => {
+        const result = await apiCall("/api/stock/productos/unidad");
+        return result.success ? (Array.isArray(result.data) ? result.data : result) : [];
+      }
+    );
+    
+    setUnidades(Array.isArray(response) ? response : []);
   };
 
   const handleAgregarUnidades = async values => {
     try {
-      const res = await fetch("/api/stock/productos/unidad", {
+      const data = await apiCall("/api/stock/productos/unidad", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id_producto: unidadProductoId,
           ...values,
         }),
       });
-      const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message);
-
-      notifications.show({
-        title: "Unidades agregadas",
-        message: data.message,
-        color: "green",
-      });
+      showSuccessNotification(
+        data.message || "Unidades agregadas correctamente",
+        "Unidades agregadas"
+      );
 
       setOpenedUnidad(false);
       formUnidad.reset();
       fetchProductos();
     } catch (error) {
-      notifications.show({
-        title: "Error al agregar unidades",
-        message: error.message,
-        color: "red",
-      });
+      console.error("Error al agregar unidades:", error);
+      showErrorNotification(error, "Error al agregar unidades");
     }
   };
 
   const fetchProductos = async () => {
-    try {
-      const res = await fetch("/api/stock/productos");
-      const data = await res.json();
-      setProductos(Array.isArray(data)? data: []);
-    } catch (err) {
-      console.error("Error al obtener productos:", err);
-    } finally {
-      setLoading(false);
-    }
+    const response = await executeAsync(
+      async () => {
+        const result = await apiCall("/api/stock/productos");
+        return result.success ? (Array.isArray(result.data) ? result.data : result) : [];
+      }
+    );
+    
+    setProductos(Array.isArray(response) ? response : []);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -198,22 +196,17 @@ const Inventario = () => {
         ? `/api/stock/productos/${productoEditandoId}`
         : `/api/stock/productos`;
 
-      const res = await fetch(url, {
+      const data = await apiCall(url, {
         method,
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
-      const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message);
-
-      notifications.show({
-        title: modoEdicion ? "Producto actualizado" : "Producto creado",
-        message: modoEdicion
+      showSuccessNotification(
+        modoEdicion
           ? "Se actualizó el producto correctamente"
           : "Se creó el producto correctamente",
-        color: "black",
-      });
+        modoEdicion ? "Producto actualizado" : "Producto creado"
+      );
 
       setOpened(false);
       form.reset();
@@ -221,52 +214,39 @@ const Inventario = () => {
       setModoEdicion(false);
       setProductoEditandoId(null);
     } catch (error) {
-      notifications.show({
-        title: "Error",
-        message: error.message,
-        color: "red",
-      });
+      console.error("Error al guardar producto:", error);
+      showErrorNotification(error, "Error al guardar producto");
     }
   };
 
   const handleDelete = async id => {
     if (!confirm("¿Estás seguro que deseas eliminar este producto?")) return;
     try {
-      const res = await fetch(`/api/stock/productos/${id}`, {
+      const data = await apiCall(`/api/stock/productos/${id}`, {
         method: "DELETE",
       });
-      const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message);
-
-      notifications.show({
-        title: "Producto eliminado",
-        message: "Se eliminó el producto correctamente",
-        color: "green",
-      });
+      showSuccessNotification(
+        data.message || "Se eliminó el producto correctamente",
+        "Producto eliminado"
+      );
 
       fetchProductos(); // Recargar lista
     } catch (error) {
-      notifications.show({
-        title: "Error",
-        message: error.message,
-        color: "red",
-      });
+      console.error("Error al eliminar producto:", error);
+      showErrorNotification(error, "Error al eliminar producto");
     }
   };
 
   const handleObtenerAlmacenes = async () => {
-    try {
-      const res = await fetch("/api/stock/almacenes", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await res.json();
-      setAlmacenes(data);
-    } catch (err) {
-      console.error("Error al obtener almacenes:", err);
-      return [];
-    }
+    const response = await executeAsync(
+      async () => {
+        const result = await apiCall("/api/stock/almacenes");
+        return result.success ? (Array.isArray(result.data) ? result.data : result) : [];
+      }
+    );
+    
+    setAlmacenes(Array.isArray(response) ? response : []);
   };
 
   const handleEdit = producto => {

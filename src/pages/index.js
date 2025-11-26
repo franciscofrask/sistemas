@@ -1,27 +1,23 @@
 "use client";
 import { Title } from "@mantine/core";
-import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { LayoutBase } from "@/layouts";
 
 export default function Home() {
   const router = useRouter();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
-    router.push("/stock/inventario");
-  }, [router]);
+    if (status === "authenticated") {
+      router.push("/stock/dashboard");
+    }
+  }, [router, status]);
 
   return (
-    <>
-      <Title order={1}>Sistemas</Title>
-
-      {/*
-      <Link href="/stock/inventario">
-        <Button>
-          Get Started
-        </Button>
-      </Link>
-      */}
-    </>
+    <LayoutBase>
+      <Title order={1}>Cargando Sistema...</Title>
+    </LayoutBase>
   );
 }
