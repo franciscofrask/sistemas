@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import ProtectedLayout from '@/components/Layout/ProtectedLayout';
 import {
     Container,
     Paper,
@@ -210,7 +211,8 @@ const AdminUsuarios = () => {
     }
 
     return (
-        <Container fluid>
+        <ProtectedLayout>
+            <Container fluid>
             <Paper p="xl" shadow="sm" style={{ backgroundColor: 'white', borderRadius: '12px' }}>
                 <Group justify="space-between" mb="xl">
                     <div>
@@ -452,6 +454,7 @@ const AdminUsuarios = () => {
                 )}
             </Modal>
         </Container>
+        </ProtectedLayout>
     );
 };
 

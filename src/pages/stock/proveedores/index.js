@@ -16,7 +16,7 @@ import {
   Pagination,
   ActionIcon,
 } from "@mantine/core";
-import { LayoutBase } from "@/layouts";
+import ProtectedLayout from "@/components/Layout/ProtectedLayout";
 import { useForm } from "@mantine/form";
 import { IconSearch, IconSettings, IconTrash, IconPencil } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
@@ -136,7 +136,7 @@ const Proveedores = () => {
   const pageRows = proveedoresFiltrados.slice(start, start + rowsPerPage);
 
   return (
-    <LayoutBase>
+    <ProtectedLayout>
       <Container size="lg">
         
 
@@ -254,7 +254,7 @@ const Proveedores = () => {
           </form>
         </Modal>
       </Container>
-    </LayoutBase>
+    </ProtectedLayout>
   );
 };
 

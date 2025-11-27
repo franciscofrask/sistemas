@@ -13,7 +13,7 @@ import {
   Pagination,
   ActionIcon,
 } from "@mantine/core";
-import { LayoutBase } from "@/layouts";
+import ProtectedLayout from "@/components/Layout/ProtectedLayout";
 import { useForm } from "@mantine/form";
 import { IconSearch, IconTrash, IconPencil } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
@@ -122,7 +122,7 @@ const Clientes = () => {
   const pageRows = clientesFiltrados.slice(start, start + rowsPerPage);
 
   return (
-    <LayoutBase>
+    <ProtectedLayout>
       <Container size="lg">
       
 
@@ -241,7 +241,7 @@ const Clientes = () => {
           </form>
         </Modal>
       </Container>
-    </LayoutBase>
+    </ProtectedLayout>
   );
 };
 

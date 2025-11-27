@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LayoutBase } from "@/layouts";
+import ProtectedLayout from "@/components/Layout/ProtectedLayout";
 import {
   Button,
   Card,
@@ -357,7 +357,7 @@ const Inventario = () => {
   ));
 
   return (
-    <LayoutBase>
+    <ProtectedLayout>
       <Container size="lg" >
        
         <Grid mt={20}>
@@ -776,7 +776,7 @@ const Inventario = () => {
           )}
         </Modal>
       </Container>
-    </LayoutBase>
+    </ProtectedLayout>
   );
 };
 

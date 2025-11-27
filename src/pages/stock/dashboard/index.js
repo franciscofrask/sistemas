@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LayoutBase } from "@/layouts";
+import ProtectedLayout from "@/components/Layout/ProtectedLayout";
 import {
   Card,
   Container,
@@ -148,7 +148,7 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <LayoutBase>
+      <ProtectedLayout>
         <Container fluid>
           <Center style={{ height: 400 }}>
             <Stack align="center">
@@ -157,12 +157,12 @@ const Dashboard = () => {
             </Stack>
           </Center>
         </Container>
-      </LayoutBase>
+      </ProtectedLayout>
     );
   }
 
   return (
-    <LayoutBase>
+    <ProtectedLayout>
       <Container fluid>
         <Grid>
           {/* Header */}
@@ -386,7 +386,7 @@ const Dashboard = () => {
           </Grid.Col>
         </Grid>
       </Container>
-    </LayoutBase>
+    </ProtectedLayout>
   );
 };
 

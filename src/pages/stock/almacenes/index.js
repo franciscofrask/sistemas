@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { LayoutBase } from "@/layouts";
+import ProtectedLayout from "@/components/Layout/ProtectedLayout";
 import {
   Button,
   Card,
@@ -142,7 +142,7 @@ export default function AlmacenesPage() {
   ));
 
   return (
-    <LayoutBase>
+    <ProtectedLayout>
       <Container size="lg">
        
 
@@ -227,6 +227,6 @@ export default function AlmacenesPage() {
           </form>
         </Modal>
       </Container>
-    </LayoutBase>
+    </ProtectedLayout>
   );
 }

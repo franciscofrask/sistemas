@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { LayoutBase } from "@/layouts";
+import ProtectedLayout from "@/components/Layout/ProtectedLayout";
 import {
   Button,
   Card,
@@ -93,7 +93,7 @@ export default function PresupuestosPage() {
   ));
 
   return (
-    <LayoutBase>
+    <ProtectedLayout>
       <Container size="lg">
         <Title>Componente en desarrollo</Title>
         <Grid mt={20}>
@@ -160,6 +160,6 @@ export default function PresupuestosPage() {
           </Group>
         </Grid>
       </Container>
-    </LayoutBase>
+    </ProtectedLayout>
   );
 }
