@@ -93,6 +93,37 @@ const AdminUsuarios = () => {
         }
     }, [session]);
 
+    // Crear usuario
+    const createUser = async () => {
+        if (!editingUser || !session?.user?.token) return;
+        
+        setSaving(true);
+        try {
+            const response = await fetch('/api/admin/usuarios/crear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.user.token}`
+                },
+                body: JSON.stringify(editingUser)
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                alert('Usuario creado exitosamente');
+                closeModal();
+                loadUsers(); // Recargar la lista
+                setEditingUser(null);
+            } else {
+                alert(result.message || 'Error al crear usuario');
+            }
+        } catch (error) {
+            console.error('Error creando usuario:', error);
+            alert('Error de conexión al crear usuario');
+        }
+        setSaving(false);
+    };
+
     // Actualizar usuario
     const updateUser = async () => {
         if (!editingUser || !session?.user?.token) return;
@@ -162,6 +193,17 @@ const AdminUsuarios = () => {
                 nombre_usuario: user.nombre_usuario,
                 correo: user.correo,
                 rol_id: user.rol_id
+            });
+        } else if (type === 'create') {
+            // Inicializar formulario para nuevo usuario
+            setEditingUser({
+                nombre: '',
+                apellido: '',
+                nombre_usuario: '',
+                correo: '',
+                contrasena: '',
+                rol_id: 2, // Usuario por defecto
+                fecha_incorporacion: new Date().toISOString().split('T')[0]
             });
         } else {
             setEditingUser(null);
@@ -373,44 +415,61 @@ const AdminUsuarios = () => {
                             <Grid.Col span={6}>
                                 <TextInput
                                     label="Nombre"
-                                    value={modalType === 'view' ? selectedUser.nombre : editingUser?.nombre || ''}
-                                    onChange={(e) => modalType === 'edit' && setEditingUser({...editingUser, nombre: e.target.value})}
+                                    value={modalType === 'view' ? selectedUser?.nombre : editingUser?.nombre || ''}
+                                    onChange={(e) => (modalType === 'edit' || modalType === 'create') && setEditingUser({...editingUser, nombre: e.target.value})}
                                     readOnly={modalType === 'view'}
                                 />
                             </Grid.Col>
                             <Grid.Col span={6}>
                                 <TextInput
                                     label="Apellido"
-                                    value={modalType === 'view' ? selectedUser.apellido : editingUser?.apellido || ''}
-                                    onChange={(e) => modalType === 'edit' && setEditingUser({...editingUser, apellido: e.target.value})}
+                                    value={modalType === 'view' ? selectedUser?.apellido : editingUser?.apellido || ''}
+                                    onChange={(e) => (modalType === 'edit' || modalType === 'create') && setEditingUser({...editingUser, apellido: e.target.value})}
                                     readOnly={modalType === 'view'}
                                 />
                             </Grid.Col>
+                            
                             <Grid.Col span={6}>
                                 <TextInput
-                                    label="Usuario"
-                                    value={modalType === 'view' ? selectedUser.nombre_usuario : editingUser?.nombre_usuario || ''}
-                                    onChange={(e) => modalType === 'edit' && setEditingUser({...editingUser, nombre_usuario: e.target.value})}
+                                    label="Nombre de Usuario"
+                                    value={modalType === 'view' ? selectedUser?.nombre_usuario : editingUser?.nombre_usuario || ''}
+                                    onChange={(e) => (modalType === 'edit' || modalType === 'create') && setEditingUser({...editingUser, nombre_usuario: e.target.value})}
                                     readOnly={modalType === 'view'}
+                                    placeholder={modalType === 'create' ? 'Usuario único para login' : ''}
                                 />
                             </Grid.Col>
+                            
                             <Grid.Col span={6}>
                                 <TextInput
                                     label="Email"
-                                    value={modalType === 'view' ? selectedUser.correo : editingUser?.correo || ''}
-                                    onChange={(e) => modalType === 'edit' && setEditingUser({...editingUser, correo: e.target.value})}
+                                    value={modalType === 'view' ? selectedUser?.correo : editingUser?.correo || ''}
+                                    onChange={(e) => (modalType === 'edit' || modalType === 'create') && setEditingUser({...editingUser, correo: e.target.value})}
                                     readOnly={modalType === 'view'}
+                                    placeholder={modalType === 'create' ? 'usuario@ejemplo.com' : ''}
                                 />
                             </Grid.Col>
+                            
+                            {modalType === 'create' && (
+                                <Grid.Col span={6}>
+                                    <TextInput
+                                        label="Contraseña"
+                                        type="password"
+                                        value={editingUser?.contrasena || ''}
+                                        onChange={(e) => setEditingUser({...editingUser, contrasena: e.target.value})}
+                                        placeholder="Mínimo 6 caracteres"
+                                    />
+                                </Grid.Col>
+                            )}
+                            
                             {modalType !== 'view' && (
-                                <Grid.Col span={12}>
+                                <Grid.Col span={6}>
                                     <Select
                                         label="Rol"
                                         value={editingUser?.rol_id?.toString() || ''}
                                         data={[
                                             { value: '1', label: 'Administrador' },
                                             { value: '2', label: 'Usuario' },
-                                            { value: '3', label: 'Gerente' }
+                                            { value: '3', label: 'Manager' }
                                         ]}
                                         onChange={(value) => {
                                             if (value) setEditingUser({...editingUser, rol_id: parseInt(value)});
@@ -429,7 +488,7 @@ const AdminUsuarios = () => {
                             )}
                         </Grid>
                         
-                        {modalType === 'edit' && (
+                        {(modalType === 'edit' || modalType === 'create') && (
                             <Group justify="flex-end" mt="lg">
                                 <Button 
                                     variant="light" 
@@ -439,14 +498,14 @@ const AdminUsuarios = () => {
                                     Cancelar
                                 </Button>
                                 <Button
-                                    onClick={updateUser}
+                                    onClick={modalType === 'create' ? createUser : updateUser}
                                     loading={saving}
                                     style={{
                                         background: 'linear-gradient(45deg, #EE0E0F, #FF4444)',
                                         border: 'none'
                                     }}
                                 >
-                                    Guardar Cambios
+                                    {modalType === 'create' ? 'Crear Usuario' : 'Guardar Cambios'}
                                 </Button>
                             </Group>
                         )}

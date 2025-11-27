@@ -21,6 +21,8 @@ export async function validateToken(req) {
             new TextEncoder().encode(process.env.NEXT_PUBLIC_USER_JWT)
         );
         
+        console.log('Payload del token:', payload);
+        
         return {
             success: true,
             user: payload

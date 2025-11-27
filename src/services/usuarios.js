@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { service_DBconn } from './db';
 
 export async function service_Login(_db, _usuario, _clave) {
     try {
@@ -51,6 +52,72 @@ export async function service_Login(_db, _usuario, _clave) {
             }
         }
         throw new Error('Error desconocido en el login');
+    }
+}
+
+export async function service_CrearUsuario(datosUsuario) {
+    let connection;
+    
+    try {
+        connection = await service_DBconn();
+        
+        const {
+            nombre_usuario,
+            correo,
+            contrasena_hash,
+            nombre,
+            apellido,
+            fecha_nacimiento,
+            fecha_incorporacion,
+            rol_id
+        } = datosUsuario;
+        
+        // Ejecutar el procedimiento almacenado
+        await connection.execute(
+            'CALL crear_usuario(?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                nombre_usuario,
+                correo,
+                contrasena_hash,
+                nombre,
+                apellido,
+                fecha_nacimiento,
+                fecha_incorporacion,
+                rol_id
+            ]
+        );
+        
+        await connection.end();
+        
+        return {
+            success: true,
+            message: 'Usuario creado exitosamente'
+        };
+        
+    } catch (error) {
+        console.error('Error creando usuario:', error);
+        if (connection) await connection.end();
+        
+        // Manejar errores específicos
+        if (error.code === 'ER_DUP_ENTRY') {
+            if (error.sqlMessage.includes('nombre_usuario')) {
+                return {
+                    success: false,
+                    message: 'El nombre de usuario ya está en uso'
+                };
+            }
+            if (error.sqlMessage.includes('correo')) {
+                return {
+                    success: false,
+                    message: 'El correo electrónico ya está registrado'
+                };
+            }
+        }
+        
+        return {
+            success: false,
+            message: 'Error interno del servidor al crear usuario'
+        };
     }
 }
 
