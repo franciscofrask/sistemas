@@ -7,6 +7,7 @@ import {
   Flex,
   Group,
   ActionIcon,
+  LoadingOverlay,
 } from "@mantine/core";
 import {
   IconLayoutDashboard,
@@ -18,72 +19,47 @@ import {
   IconBrandInstagram,
   IconStack,
   IconBuildingWarehouse,
+  IconSettings,
+  IconShield,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const menuItems = [
-  {
-    label: "Dashboard",
-    icon: IconLayoutDashboard,
-    path: "/stock/dashboard",
-  },
-  {
-    label: "Inventario",
-    icon: IconStack,
-    path: "/stock/inventario",
-  },
-  {
-    label: "Almacenes",
-    icon: IconBuildingWarehouse,
-    path: "/stock/almacenes",
-  },
-  {
-    label: "Proveedores",
-    icon: IconTruck,
-    path: "/stock/proveedores",
-  },
-  {
-    label: "Clientes",
-    icon: IconUsers,
-    path: "/stock/clientes",
-  },
-  {
-    label: "Presupuestos",
-    icon: IconFileText,
-    children: [
-      {
-        label: "Listado de presupuestos",
-        path: "/stock/presupuestos",
-      },
-      {
-        label: "Crear Presupuesto",
-        path: "/stock/presupuestos/crearpresupuesto",
-      },
-    ],
-  },
-  {
-    label: "Comercio",
-    icon: IconShoppingCart,
-    children: [
-      {
-        label: "Ventas",
-        path: "/stock/ventas",
-      },
-    ],
-  },
-];
+import { useSession } from "next-auth/react";
+import { useFuncionalidades } from "@/hooks/useFuncionalidades";
 
 const Sidebar = () => {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const { funcionalidades, loading, mapearAMenuItems } = useFuncionalidades();
+
+  // Mapeo de iconos por nombre
+  const iconMap = {
+    IconLayoutDashboard,
+    IconUsers,
+    IconTruck,
+    IconFileText,
+    IconShoppingCart,
+    IconStack,
+    IconBuildingWarehouse,
+    IconShield,
+  };
+
+  // Convertir funcionalidades a elementos de menú (ya incluye Dashboard si tiene permisos)
+  const allMenuItems = mapearAMenuItems().map(item => ({
+    ...item,
+    icon: iconMap[item.icon] || IconSettings
+  }));
 
   const isActive = (path) => pathname === path;
 
   return (
     <Flex direction="column" justify="space-between" h="100%">
+      {/* Indicador de carga */}
+      <LoadingOverlay visible={loading} />
+      
       {/* Menú principal */}
       <div>
-        {menuItems.map((item) => {
+        {allMenuItems.map((item) => {
           const isParentActive = isActive(item.path);
           const isChildActive = item.children?.some((child) =>
             isActive(child.path)

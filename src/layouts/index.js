@@ -198,10 +198,10 @@ export function LayoutBase({ children }) {
                   </Avatar>
                   <div style={{ flex: 1, minWidth: 120 }}>
                     <Text size="sm" c="white" fw={500} truncate>
-                      {session?.usuario?.persona_datos?.split(' ')[0] || 'Usuario'}
+                      {session?.user?.nombre?.split(' ')[0] || 'Usuario'}
                     </Text>
                     <Text size="xs" c="gray.4" truncate>
-                      {session?.usuario?.mail || 'admin@sistema.com'}
+                      {session?.user?.role || 'admin@sistema.com'}
                     </Text>
                   </div>
                   <IconChevronDown size={14} color="rgba(255, 255, 255, 0.7)" />

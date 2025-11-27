@@ -8,7 +8,7 @@ export function usePermisos() {
     const { data: session } = useSession();
 
     useEffect(() => {
-        if (session?.usuario?.token) {
+        if (session?.user?.token) {
             obtenerPermisos();
         }
     }, [session]);
@@ -17,7 +17,7 @@ export function usePermisos() {
         try {
             const response = await fetch('/api/usuarios/permisos', {
                 headers: {
-                    'Authorization': `Bearer ${session.usuario.token}`
+                    'Authorization': `Bearer ${session.user.token}`
                 }
             });
             

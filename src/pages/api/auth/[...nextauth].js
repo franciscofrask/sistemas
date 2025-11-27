@@ -48,7 +48,7 @@ export const authOptions = {
             .sign(new TextEncoder().encode(process.env.NEXT_PUBLIC_USER_JWT));
             
             if (token) {
-                session.usuario = {
+                session.user = {
                     id: token.id,
                     uid: token.uid,
                     nombre: token.nombre,

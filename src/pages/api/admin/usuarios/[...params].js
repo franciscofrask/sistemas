@@ -1,16 +1,10 @@
-import { getToken } from "next-auth/jwt";
-import pool from "@/lib/db";
+import { requireAuth } from "@/middleware/authMiddleware";
+import { service_DBconn } from "@/services/db";
 
 export default async function handler(req, res) {
     // Verificar autenticación y permisos de administrador
-    const token = await getToken({ req, secret: "tu_jwt_secret_muy_seguro" });
-    
-    if (!token || token.role !== 'admin') {
-        return res.status(403).json({ 
-            success: false, 
-            message: 'No tiene permisos para realizar esta acción' 
-        });
-    }
+    const user = await requireAuth(req, res, 'admin');
+    if (!user) return; // requireAuth ya envió la respuesta de error
 
     const { params } = req.query;
     
@@ -37,13 +31,13 @@ export default async function handler(req, res) {
                 });
             }
 
-            const connection = await pool.getConnection();
+            const connection = await service_DBconn();
             
             await connection.execute('CALL asignar_rol_usuario(?, ?)', [
                 userId, rol_id
             ]);
             
-            connection.release();
+            await connection.end();
             
             return res.status(200).json({
                 success: true,
@@ -62,7 +56,7 @@ export default async function handler(req, res) {
     // Obtener usuario específico
     if (req.method === 'GET') {
         try {
-            const connection = await pool.getConnection();
+            const connection = await service_DBconn();
             
             const [user] = await connection.execute(
                 `SELECT 
@@ -86,7 +80,7 @@ export default async function handler(req, res) {
                 [userId]
             );
             
-            connection.release();
+            await connection.end();
             
             if (user.length === 0) {
                 return res.status(404).json({
@@ -121,7 +115,7 @@ export default async function handler(req, res) {
                 });
             }
 
-            const connection = await pool.getConnection();
+            const connection = await service_DBconn();
             
             await connection.execute('CALL editar_usuario(?, ?, ?, ?, ?, ?)', [
                 userId,
@@ -132,7 +126,7 @@ export default async function handler(req, res) {
                 rol_id || null
             ]);
             
-            connection.release();
+            await connection.end();
             
             return res.status(200).json({
                 success: true,
@@ -151,11 +145,11 @@ export default async function handler(req, res) {
     // Eliminar usuario (borrado lógico)
     if (req.method === 'DELETE') {
         try {
-            const connection = await pool.getConnection();
+            const connection = await service_DBconn();
             
             await connection.execute('CALL borrar_usuario_logico(?)', [userId]);
             
-            connection.release();
+            await connection.end();
             
             return res.status(200).json({
                 success: true,

@@ -40,7 +40,6 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import { apiCall, showSuccessNotification, showErrorNotification } from '@/utils/errorHandler';
 
 const AdminUsuarios = () => {
     const { data: session } = useSession();
@@ -55,57 +54,97 @@ const AdminUsuarios = () => {
 
     // Verificar si es administrador
     useEffect(() => {
-        if (session && session.usuario?.role !== 'admin') {
+        if (session && session.user?.role !== 'admin') {
             router.push('/');
-            showErrorNotification('No tiene permisos para acceder a esta sección');
+            alert('No tiene permisos para acceder a esta sección');
         }
     }, [session, router]);
 
     // Cargar usuarios
     const loadUsers = async () => {
+        if (!session?.user?.token) return;
+        
         setLoading(true);
-        const result = await apiCall('/api/admin/usuarios');
-        if (result.success) {
-            setUsers(result.data || []);
+        try {
+            const response = await fetch('/api/admin/usuarios', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.user.token}`
+                }
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                setUsers(result.data || []);
+            } else {
+                alert(result.mensaje || 'Error al cargar usuarios');
+            }
+        } catch (error) {
+            alert('Error de conexión al cargar usuarios');
         }
         setLoading(false);
     };
 
     useEffect(() => {
-        if (session?.usuario?.role === 'admin') {
+        if (session?.user?.role === 'admin') {
             loadUsers();
         }
     }, [session]);
 
     // Actualizar usuario
     const updateUser = async () => {
-        if (!editingUser) return;
+        if (!editingUser || !session?.user?.token) return;
         
         setSaving(true);
-        const result = await apiCall(`/api/admin/usuarios/${editingUser.id}`, {
-            method: 'PUT',
-            body: JSON.stringify(editingUser)
-        });
-
-        if (result.success) {
-            showSuccessNotification('Usuario actualizado correctamente');
-            loadUsers();
-            closeModal();
+        try {
+            const response = await fetch(`/api/admin/usuarios/${editingUser.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.user.token}`
+                },
+                body: JSON.stringify(editingUser)
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                alert('Usuario actualizado correctamente');
+                loadUsers();
+                closeModal();
+            } else {
+                alert(result.mensaje || 'Error al actualizar usuario');
+            }
+        } catch (error) {
+            alert('Error de conexión al actualizar usuario');
         }
         setSaving(false);
     };
 
     // Cambiar rol del usuario (función rápida desde el dropdown)
     const changeUserRole = async (userId, newRolId) => {
-        const result = await apiCall(`/api/admin/usuarios/${userId}/rol`, {
-            method: 'PUT',
-            body: JSON.stringify({ rol_id: newRolId })
-        });
-
-        if (result.success) {
-            showSuccessNotification('Rol actualizado correctamente');
-            loadUsers();
-            closeModal();
+        if (!session?.user?.token) return;
+        
+        try {
+            const response = await fetch(`/api/admin/usuarios/${userId}/rol`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.user.token}`
+                },
+                body: JSON.stringify({ rol_id: newRolId })
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                alert('Rol actualizado correctamente');
+                loadUsers();
+                closeModal();
+            } else {
+                alert(result.mensaje || 'Error al actualizar rol');
+            }
+        } catch (error) {
+            alert('Error de conexión al actualizar rol');
         }
     };
 
@@ -130,7 +169,7 @@ const AdminUsuarios = () => {
         openModal();
     };
 
-    const getRoleBadge = (rol_id, rol_nombre) => {
+    const getRoleBadge = (rol_id, rol) => {
         const colors = {
             1: 'red',     // admin
             2: 'blue',    // usuario
@@ -138,7 +177,7 @@ const AdminUsuarios = () => {
         };
         return (
             <Badge color={colors[rol_id] || 'gray'} variant="light" size="sm">
-                {rol_nombre || 'Sin rol'}
+                {rol || 'Sin rol'}
             </Badge>
         );
     };
@@ -166,7 +205,7 @@ const AdminUsuarios = () => {
         });
     };
 
-    if (session?.usuario?.role !== 'admin') {
+    if (session?.user?.role !== 'admin') {
         return null;
     }
 
@@ -218,8 +257,8 @@ const AdminUsuarios = () => {
                                     <Table.Th>Contacto</Table.Th>
                                     <Table.Th>Rol</Table.Th>
                                     <Table.Th>Estado</Table.Th>
-                                    <Table.Th>Registro</Table.Th>
-                                    <Table.Th>Última Act.</Table.Th>
+                                    <Table.Th>Incorporación</Table.Th>
+                                    <Table.Th>Baja</Table.Th>
                                     <Table.Th style={{ textAlign: 'center' }}>Acciones</Table.Th>
                                 </Table.Tr>
                             </Table.Thead>
@@ -241,7 +280,7 @@ const AdminUsuarios = () => {
                                                 </Avatar>
                                                 <div>
                                                     <Text fw={500} size="sm">
-                                                        {user.nombre_completo || `${user.nombre} ${user.apellido}`}
+                                                        {`${user.nombre} ${user.apellido}`}
                                                     </Text>
                                                     <Text c="dimmed" size="xs">
                                                         @{user.nombre_usuario}
@@ -256,19 +295,19 @@ const AdminUsuarios = () => {
                                             </Group>
                                         </Table.Td>
                                         <Table.Td>
-                                            {getRoleBadge(user.rol_id, user.rol_nombre)}
+                                            {getRoleBadge(user.rol_id, user.rol)}
                                         </Table.Td>
                                         <Table.Td>
                                             {getStatusBadge(user.activo)}
                                         </Table.Td>
                                         <Table.Td>
                                             <Text size="sm">
-                                                {formatDate(user.creado_en)}
+                                                {formatDate(user.fecha_incorporacion)}
                                             </Text>
                                         </Table.Td>
                                         <Table.Td>
                                             <Text size="sm">
-                                                {formatDate(user.actualizado_en)}
+                                                {formatDate(user.fecha_baja)}
                                             </Text>
                                         </Table.Td>
                                         <Table.Td>
@@ -381,7 +420,7 @@ const AdminUsuarios = () => {
                                 <Grid.Col span={12}>
                                     <TextInput
                                         label="Rol"
-                                        value={selectedUser.rol_nombre}
+                                        value={selectedUser.rol}
                                         readOnly
                                     />
                                 </Grid.Col>

@@ -1,24 +1,18 @@
-import { getToken } from "next-auth/jwt";
-import pool from "@/lib/db";
+import { requireAuth } from "@/middleware/authMiddleware";
+import { service_DBconn } from "@/services/db";
 
 export default async function handler(req, res) {
     // Verificar autenticación y permisos de administrador
-    const token = await getToken({ req, secret: "tu_jwt_secret_muy_seguro" });
-    
-    if (!token || token.role !== 'admin') {
-        return res.status(403).json({ 
-            success: false, 
-            message: 'No tiene permisos para realizar esta acción' 
-        });
-    }
+    const user = await requireAuth(req, res, 'admin');
+    if (!user) return; // requireAuth ya envió la respuesta de error
 
     if (req.method === 'GET') {
         try {
-            const connection = await pool.getConnection();
+            const connection = await service_DBconn();
             
-            // Usar el procedimiento para listar usuarios
+            // Usar el procedimiento existente listar_usuarios
             const [users] = await connection.execute('CALL listar_usuarios()');
-            connection.release();
+            await connection.end();
             
             return res.status(200).json({
                 success: true,
@@ -55,7 +49,7 @@ export default async function handler(req, res) {
                 });
             }
 
-            const connection = await pool.getConnection();
+            const connection = await service_DBconn();
             
             // Crear usuario usando el procedimiento almacenado
             await connection.execute('CALL crear_usuario(?, ?, ?, ?, ?, ?, ?, ?)', [
@@ -69,7 +63,7 @@ export default async function handler(req, res) {
                 rol_id || 2
             ]);
             
-            connection.release();
+            await connection.end();
             
             return res.status(201).json({
                 success: true,
