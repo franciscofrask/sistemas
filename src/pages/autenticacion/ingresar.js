@@ -19,7 +19,6 @@ import { IconAlertCircle, IconLock, IconUser } from "@tabler/icons-react";
 import { useRouter } from "next/router";
 import { signIn } from "next-auth/react";
 import * as jwt from "jose";
-import md5 from "md5";
 
 function Login() {
     const router = useRouter();
@@ -34,9 +33,6 @@ function Login() {
         setBuscando(true);
         setErrorMessage("");
         
-        // Hash de la contraseña
-        const hashedPassword = md5(clave).toString();
-        
         // Generar token frontend
         const token = await new jwt.SignJWT({})
             .setProtectedHeader({ alg: 'HS256' })
@@ -44,7 +40,7 @@ function Login() {
             .sign(new TextEncoder().encode(process.env.NEXT_PUBLIC_FRONT_JWT));
 
         try {
-            // Llamar a la API de login
+            // Llamar a la API de login (enviamos contraseña en texto plano para bcrypt)
             const response = await fetch("/api/usuarios/login", {
                 method: "POST",
                 headers: {
@@ -53,7 +49,7 @@ function Login() {
                 },
                 body: JSON.stringify({
                     usuario: usuario,
-                    clave: hashedPassword,
+                    clave: clave, // Enviamos contraseña en texto plano
                 }),
             });
 
