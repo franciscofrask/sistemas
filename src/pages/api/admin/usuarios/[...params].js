@@ -106,7 +106,7 @@ export default async function handler(req, res) {
     // Actualizar usuario
     if (req.method === 'PUT') {
         try {
-            const { nombre, apellido, correo, nombre_usuario, rol_id } = req.body;
+            const { nombre, apellido, correo, nombre_usuario, rol_id, fecha_nacimiento, fecha_incorporacion } = req.body;
             
             if (!nombre || !apellido || !correo || !nombre_usuario) {
                 return res.status(400).json({
@@ -115,14 +115,30 @@ export default async function handler(req, res) {
                 });
             }
 
+            // Formatear fechas para MySQL (YYYY-MM-DD)
+            const formatDateForMySQL = (date) => {
+                if (!date) return null;
+                
+                // Si ya es una fecha válida, convertirla
+                const dateObj = new Date(date);
+                if (isNaN(dateObj.getTime())) return null;
+                
+                return dateObj.toISOString().split('T')[0];
+            };
+
+            const formattedFechaNacimiento = formatDateForMySQL(fecha_nacimiento);
+            const formattedFechaIncorporacion = formatDateForMySQL(fecha_incorporacion);
+
             const connection = await service_DBconn();
             
-            await connection.execute('CALL editar_usuario(?, ?, ?, ?, ?, ?)', [
+            await connection.execute('CALL editar_usuario(?, ?, ?, ?, ?, ?, ?, ?)', [
                 userId,
                 nombre_usuario,
                 correo,
                 nombre,
                 apellido,
+                formattedFechaNacimiento,
+                formattedFechaIncorporacion,
                 rol_id || null
             ]);
             

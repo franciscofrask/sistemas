@@ -185,6 +185,14 @@ const AdminUsuarios = () => {
         setSelectedUser(user);
         
         if (type === 'edit' && user) {
+            // Formatear fechas para el formulario
+            const formatDateForInput = (date) => {
+                if (!date) return '';
+                const dateObj = new Date(date);
+                if (isNaN(dateObj.getTime())) return '';
+                return dateObj.toISOString().split('T')[0];
+            };
+
             // Crear una copia del usuario para editar
             setEditingUser({
                 id: user.id,
@@ -192,7 +200,9 @@ const AdminUsuarios = () => {
                 apellido: user.apellido,
                 nombre_usuario: user.nombre_usuario,
                 correo: user.correo,
-                rol_id: user.rol_id
+                rol_id: user.rol_id,
+                fecha_nacimiento: formatDateForInput(user.fecha_nacimiento),
+                fecha_incorporacion: formatDateForInput(user.fecha_incorporacion)
             });
         } else if (type === 'create') {
             // Inicializar formulario para nuevo usuario
@@ -243,8 +253,7 @@ const AdminUsuarios = () => {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+           
         });
     };
 
@@ -478,13 +487,29 @@ const AdminUsuarios = () => {
                                 </Grid.Col>
                             )}
                             {modalType === 'view' && (
-                                <Grid.Col span={12}>
-                                    <TextInput
-                                        label="Rol"
-                                        value={selectedUser.rol}
-                                        readOnly
-                                    />
-                                </Grid.Col>
+                                <>
+                                    <Grid.Col span={6}>
+                                        <TextInput
+                                            label="Rol"
+                                            value={selectedUser?.rol || 'No asignado'}
+                                            readOnly
+                                        />
+                                    </Grid.Col>
+                                    <Grid.Col span={6}>
+                                        <TextInput
+                                            label="Fecha de Nacimiento"
+                                            value={selectedUser?.fecha_nacimiento ? formatDate(selectedUser.fecha_nacimiento) : 'No registrado'}
+                                            readOnly
+                                        />
+                                    </Grid.Col>
+                                    <Grid.Col span={6}>
+                                        <TextInput
+                                            label="Fecha de Incorporación"
+                                            value={selectedUser?.fecha_incorporacion ? formatDate(selectedUser.fecha_incorporacion) : 'No registrado'}
+                                            readOnly
+                                        />
+                                    </Grid.Col>
+                                </>
                             )}
                         </Grid>
                         

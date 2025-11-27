@@ -74,6 +74,17 @@ export default async function handler(req, res) {
         const saltRounds = 12;
         const contrasena_hash = await bcrypt.hash(contrasena, saltRounds);
 
+        // Formatear fechas para MySQL (YYYY-MM-DD)
+        const formatDateForMySQL = (date) => {
+            if (!date) return null;
+            
+            // Si ya es una fecha válida, convertirla
+            const dateObj = new Date(date);
+            if (isNaN(dateObj.getTime())) return null;
+            
+            return dateObj.toISOString().split('T')[0];
+        };
+
         // Preparar datos para el servicio
         const datosUsuario = {
             nombre_usuario,
@@ -81,8 +92,8 @@ export default async function handler(req, res) {
             contrasena_hash,
             nombre,
             apellido,
-            fecha_nacimiento: fecha_nacimiento || null,  // NULL si está vacío
-            fecha_incorporacion: fecha_incorporacion || null,  // NULL para usar CURDATE()
+            fecha_nacimiento: formatDateForMySQL(fecha_nacimiento),  // Formatear fecha
+            fecha_incorporacion: formatDateForMySQL(fecha_incorporacion),  // Formatear fecha
             rol_id: parseInt(rol_id)
         };
 
