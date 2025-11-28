@@ -37,6 +37,9 @@ import {
     IconUserCheck,
     IconUserX,
     IconRefresh,
+    IconSettings,
+    IconCheck,
+    IconX,
 } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useSession } from 'next-auth/react';
@@ -50,8 +53,13 @@ const AdminUsuarios = () => {
     const [selectedUser, setSelectedUser] = useState(null);
     const [editingUser, setEditingUser] = useState(null);
     const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
-    const [modalType, setModalType] = useState('view'); // 'view', 'edit', 'create'
+    const [modalType, setModalType] = useState('view'); // 'view', 'edit', 'create', 'permisos'
     const [saving, setSaving] = useState(false);
+    
+    // Estados para gestión de permisos
+    const [userPermisos, setUserPermisos] = useState([]);
+    const [funcionalidades, setFuncionalidades] = useState([]);
+    const [loadingPermisos, setLoadingPermisos] = useState(false);
 
     // Verificar si es administrador
     useEffect(() => {
@@ -90,8 +98,87 @@ const AdminUsuarios = () => {
     useEffect(() => {
         if (session?.user?.role === 'admin') {
             loadUsers();
+            loadFuncionalidades();
         }
     }, [session]);
+
+    // Cargar funcionalidades
+    const loadFuncionalidades = async () => {
+        if (!session?.user?.token) return;
+        
+        try {
+            const response = await fetch('/api/admin/funcionalidades', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.user.token}`
+                }
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                setFuncionalidades(result.data || []);
+            }
+        } catch (error) {
+            console.error('Error al cargar funcionalidades:', error);
+        }
+    };
+
+    // Cargar permisos de usuario
+    const loadUserPermisos = async (userId) => {
+        if (!session?.user?.token) return;
+        
+        setLoadingPermisos(true);
+        try {
+            const response = await fetch(`/api/admin/usuarios/${userId}/permisos`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.user.token}`
+                }
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                setUserPermisos(result.data || []);
+            } else {
+                alert(result.message || 'Error al cargar permisos');
+            }
+        } catch (error) {
+            alert('Error de conexión al cargar permisos');
+        }
+        setLoadingPermisos(false);
+    };
+
+    // Actualizar permiso de rol
+    const updateRolePermiso = async (rolId, funcionalidadId, puedeAcceder) => {
+        if (!session?.user?.token) return;
+        
+        try {
+            const response = await fetch(`/api/admin/roles/${rolId}/permisos`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.user.token}`
+                },
+                body: JSON.stringify({
+                    funcionalidad_id: funcionalidadId,
+                    puede_acceder: puedeAcceder ? 1 : 0
+                })
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.success) {
+                alert('Permiso actualizado correctamente');
+                // Recargar permisos del usuario
+                loadUserPermisos(selectedUser.id);
+            } else {
+                alert(result.message || 'Error al actualizar permiso');
+            }
+        } catch (error) {
+            alert('Error de conexión al actualizar permiso');
+        }
+    };
 
     // Crear usuario
     const createUser = async () => {
@@ -215,6 +302,9 @@ const AdminUsuarios = () => {
                 rol_id: 2, // Usuario por defecto
                 fecha_incorporacion: new Date().toISOString().split('T')[0]
             });
+        } else if (type === 'permisos' && user) {
+            // Cargar permisos del usuario
+            loadUserPermisos(user.id);
         } else {
             setEditingUser(null);
         }
@@ -387,6 +477,13 @@ const AdminUsuarios = () => {
                                                             Editar
                                                         </Menu.Item>
 
+                                                        <Menu.Item
+                                                            leftSection={<IconSettings size={14} />}
+                                                            onClick={() => openUserModal('permisos', user)}
+                                                        >
+                                                            Gestionar Permisos
+                                                        </Menu.Item>
+
                                                         <Menu.Divider />
 
                                                         <Menu.Item
@@ -414,11 +511,104 @@ const AdminUsuarios = () => {
                 onClose={closeModal}
                 title={
                     modalType === 'view' ? 'Detalles del Usuario' :
-                    modalType === 'edit' ? 'Editar Usuario' : 'Nuevo Usuario'
+                    modalType === 'edit' ? 'Editar Usuario' :
+                    modalType === 'permisos' ? 'Gestionar Permisos' : 'Nuevo Usuario'
                 }
                 size="lg"
             >
-                {(modalType === 'view' ? selectedUser : editingUser) && (
+                {modalType === 'permisos' && selectedUser ? (
+                    // Vista de gestión de permisos
+                    <Stack gap="md">
+                        <Card withBorder>
+                            <Group justify="space-between" mb="md">
+                                <div>
+                                    <Text size="lg" fw={600}>
+                                        {selectedUser.nombre_completo}
+                                    </Text>
+                                    <Text size="sm" c="dimmed">
+                                        Rol: {selectedUser.rol || 'Sin rol asignado'}
+                                    </Text>
+                                </div>
+                                <Badge variant="light" color="blue">
+                                    Gestión de Permisos
+                                </Badge>
+                            </Group>
+                        </Card>
+
+                        {loadingPermisos ? (
+                            <LoadingOverlay visible={true} />
+                        ) : (
+                            <Paper withBorder p="md">
+                                <Title order={4} mb="md">Funcionalidades y Permisos</Title>
+                                
+                                {userPermisos.length > 0 ? (
+                                    <Table>
+                                        <Table.Thead>
+                                            <Table.Tr>
+                                                <Table.Th>Funcionalidad</Table.Th>
+                                                <Table.Th>Descripción</Table.Th>
+                                                <Table.Th>Ruta</Table.Th>
+                                                <Table.Th>Acceso</Table.Th>
+                                                <Table.Th>Acción</Table.Th>
+                                            </Table.Tr>
+                                        </Table.Thead>
+                                        <Table.Tbody>
+                                            {userPermisos.map((permiso) => (
+                                                <Table.Tr key={permiso.funcionalidad_id}>
+                                                    <Table.Td>
+                                                        <Text fw={500}>{permiso.funcionalidad_nombre}</Text>
+                                                    </Table.Td>
+                                                    <Table.Td>
+                                                        <Text size="sm" c="dimmed">
+                                                            {permiso.funcionalidad_descripcion}
+                                                        </Text>
+                                                    </Table.Td>
+                                                    <Table.Td>
+                                                        <Text size="sm" ff="monospace" c="blue">
+                                                            {permiso.funcionalidad_ruta}
+                                                        </Text>
+                                                    </Table.Td>
+                                                    <Table.Td>
+                                                        <Badge 
+                                                            color={permiso.puede_acceder ? 'green' : 'red'} 
+                                                            variant="light"
+                                                        >
+                                                            {permiso.puede_acceder ? 'Permitido' : 'Denegado'}
+                                                        </Badge>
+                                                    </Table.Td>
+                                                    <Table.Td>
+                                                        <Switch
+                                                            checked={Boolean(permiso.puede_acceder)}
+                                                            onChange={(event) => 
+                                                                updateRolePermiso(
+                                                                    permiso.rol_id,
+                                                                    permiso.funcionalidad_id,
+                                                                    event.currentTarget.checked
+                                                                )
+                                                            }
+                                                            color="green"
+                                                            size="sm"
+                                                        />
+                                                    </Table.Td>
+                                                </Table.Tr>
+                                            ))}
+                                        </Table.Tbody>
+                                    </Table>
+                                ) : (
+                                    <Alert color="orange">
+                                        No se encontraron permisos para este usuario
+                                    </Alert>
+                                )}
+                            </Paper>
+                        )}
+                        
+                        <Group justify="flex-end" mt="lg">
+                            <Button variant="light" onClick={closeModal}>
+                                Cerrar
+                            </Button>
+                        </Group>
+                    </Stack>
+                ) : ((modalType === 'view' ? selectedUser : editingUser) && (
                     <Stack gap="md">
                         <Grid>
                             <Grid.Col span={6}>
@@ -535,7 +725,7 @@ const AdminUsuarios = () => {
                             </Group>
                         )}
                     </Stack>
-                )}
+                ))}
             </Modal>
         </Container>
         </ProtectedLayout>

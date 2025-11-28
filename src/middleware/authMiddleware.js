@@ -21,8 +21,6 @@ export async function validateToken(req) {
             new TextEncoder().encode(process.env.NEXT_PUBLIC_USER_JWT)
         );
         
-        console.log('Payload del token:', payload);
-        
         return {
             success: true,
             user: payload
@@ -55,4 +53,54 @@ export async function requireAuth(req, res, requiredRole = null) {
     }
     
     return validation.user;
+}
+
+// Middleware para páginas que acepta métodos HTTP específicos
+export function MiddlewarePagina(metodosPermitidos, handler) {
+    return async (req, res) => {
+        // Verificar si el método HTTP está permitido
+        if (!metodosPermitidos.includes(req.method)) {
+            return res.status(405).json({
+                success: false,
+                message: 'Método no permitido'
+            });
+        }
+
+        try {
+            // Ejecutar el handler
+            return await handler(req, res);
+        } catch (error) {
+            console.error('Error en middleware de página:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Error interno del servidor'
+            });
+        }
+    };
+}
+
+// Middleware para usuarios logueados
+export function MiddlewareUsuarioLogeado(handler) {
+    return async (req, res) => {
+        try {
+            // Validar token de autenticación
+            const user = await requireAuth(req, res);
+            if (!user) {
+                // requireAuth ya envió la respuesta de error
+                return;
+            }
+
+            // Agregar usuario a la request
+            req.user = user;
+
+            // Ejecutar el handler
+            return await handler(req, res);
+        } catch (error) {
+            console.error('Error en middleware de usuario logueado:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Error interno del servidor'
+            });
+        }
+    };
 }

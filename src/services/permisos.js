@@ -103,3 +103,96 @@ export async function service_ObtenerRutasPermitidas(usuario_id) {
         return [];
     }
 }
+
+// Servicio para obtener permisos de un usuario específico
+export async function service_ObtenerPermisosUsuario(usuario_id) {
+    let connection;
+    
+    try {
+        connection = await service_DBconn();
+        
+        const [results] = await connection.execute(
+            'CALL obtener_permisos_usuario(?)',
+            [usuario_id]
+        );
+        
+        await connection.end();
+        
+        // Los resultados están en results[0] debido a la estructura del procedimiento almacenado
+        const permisos = results[0] || [];
+        
+        return {
+            success: true,
+            data: permisos
+        };
+        
+    } catch (error) {
+        console.error('Error obteniendo permisos de usuario:', error);
+        if (connection) await connection.end();
+        return {
+            success: false,
+            message: 'Error al obtener permisos del usuario'
+        };
+    }
+}
+
+// Servicio para obtener permisos de un rol específico
+export async function service_ObtenerPermisosRol(rol_id) {
+    let connection;
+    
+    try {
+        connection = await service_DBconn();
+        
+        const [results] = await connection.execute(
+            'CALL obtener_permisos_rol(?)',
+            [rol_id]
+        );
+        
+        await connection.end();
+        
+        // Los resultados están en results[0] debido a la estructura del procedimiento almacenado
+        const permisos = results[0] || [];
+        
+        return {
+            success: true,
+            data: permisos
+        };
+        
+    } catch (error) {
+        console.error('Error obteniendo permisos de rol:', error);
+        if (connection) await connection.end();
+        return {
+            success: false,
+            message: 'Error al obtener permisos del rol'
+        };
+    }
+}
+
+// Servicio para asignar/modificar permiso de funcionalidad
+export async function service_AsignarPermisoFuncionalidad(rol_id, funcionalidad_id, puede_acceder) {
+    let connection;
+    
+    try {
+        connection = await service_DBconn();
+        
+        await connection.execute(
+            'CALL asignar_permiso_funcionalidad(?, ?, ?)',
+            [rol_id, funcionalidad_id, puede_acceder]
+        );
+        
+        await connection.end();
+        
+        return {
+            success: true,
+            message: 'Permiso actualizado correctamente'
+        };
+        
+    } catch (error) {
+        console.error('Error asignando permiso:', error);
+        if (connection) await connection.end();
+        return {
+            success: false,
+            message: 'Error al asignar el permiso'
+        };
+    }
+}

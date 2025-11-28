@@ -1,4 +1,4 @@
-import { MiddlewarePagina } from "@/middleware";
+import { MiddlewarePagina } from "@/middleware/authMiddleware";
 import { service_DBconn } from "@/services/db";
 import { service_Login } from "@/services/usuarios";
 

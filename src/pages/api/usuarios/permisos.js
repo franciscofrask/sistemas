@@ -1,4 +1,4 @@
-import { MiddlewareUsuarioLogeado } from "@/middleware";
+import { MiddlewareUsuarioLogeado } from "@/middleware/authMiddleware";
 import { service_DBconn } from "@/services/db";
 import { service_ObtenerPermisos } from "@/services/usuarios";
 
