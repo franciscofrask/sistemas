@@ -37,7 +37,9 @@ export function useFuncionalidades() {
             const data = await response.json();
             
             if (data.success) {
-                setFuncionalidades(data.data);
+                // Los datos pueden venir anidados desde el procedimiento almacenado
+                const funcionalidadesData = Array.isArray(data.data) ? data.data : data.data[0];
+                setFuncionalidades(funcionalidadesData);
             } else {
                 setError(data.message || 'Error al obtener funcionalidades');
             }
@@ -51,50 +53,41 @@ export function useFuncionalidades() {
 
     // Función para mapear funcionalidades a elementos de menú
     const mapearAMenuItems = () => {
+        if (!Array.isArray(funcionalidades)) {
+            return [];
+        }
+        
         return funcionalidades.map(func => {
             const nombre = func.nombre.toLowerCase();
             
-            // Mapeo de rutas según las funcionalidades existentes
-            const rutaMap = {
-                'dashboard': '/stock/dashboard',
-                'inventario': '/stock/inventario',
-                'almacenes': '/stock/almacenes', 
-                'proveedores': '/stock/proveedores',
-                'clientes': '/stock/clientes',
-                'presupuesto': '/stock/presupuestos',
-                'comercio': '/stock/ventas',
-                'administracion': '/admin/usuarios'
-            };
-
-            // Mapeo de iconos
-            const iconoMap = {
-                'dashboard': 'IconLayoutDashboard',
-                'inventario': 'IconStack',
-                'almacenes': 'IconBuildingWarehouse',
-                'proveedores': 'IconTruck',
-                'clientes': 'IconUsers',
-                'presupuesto': 'IconFileText',
-                'comercio': 'IconShoppingCart',
-                'administracion': 'IconShield'
-            };
-
-            return {
+            // Usar directamente los datos de la base de datos
+            const menuItem = {
                 id: func.id,
                 label: func.nombre.charAt(0).toUpperCase() + func.nombre.slice(1).toLowerCase(),
-                path: rutaMap[nombre],
-                icon: iconoMap[nombre],
+                path: func.ruta, // Directamente de la BD
+                icon: func.icono, // Directamente de la BD
                 descripcion: func.descripcion,
-                puede_acceder: func.puede_acceder,
-                children: nombre === 'presupuesto' ? [
+                puede_acceder: func.puede_acceder
+            };
+
+            // Solo agregar children para funcionalidades específicas (esto se puede hacer dinámico después si necesitas)
+            if (nombre === 'presupuesto') {
+                menuItem.children = [
                     { label: 'Listado de presupuestos', path: '/stock/presupuestos' },
                     { label: 'Crear Presupuesto', path: '/stock/presupuestos/crearpresupuesto' }
-                ] : nombre === 'comercio' ? [
+                ];
+            } else if (nombre === 'comercio') {
+                menuItem.children = [
                     { label: 'Ventas', path: '/stock/ventas' },
                     { label: 'Crear Venta', path: '/stock/ventas/crearventa' }
-                ] : nombre === 'administracion' ? [
+                ];
+            } else if (nombre === 'administracion') {
+                menuItem.children = [
                     { label: 'Usuarios', path: '/admin/usuarios' }
-                ] : undefined
-            };
+                ];
+            }
+
+            return menuItem;
         });
     };
 

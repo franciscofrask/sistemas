@@ -29,6 +29,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { useStableSession } from "@/hooks/useStableSession";
 import Sidebar from "@/components/Navbars/SideBar";
 import Link from "next/link";
 
@@ -41,7 +42,7 @@ export function LayoutBase({ children }) {
   const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
   const pathname = usePathname();
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session, status } = useStableSession();
 
   // Hook para manejo global de errores
   useErrorHandler();

@@ -68,11 +68,24 @@ export const authOptions = {
     session: {
         strategy: "jwt",
         maxAge: 8 * 60 * 60, // 8 horas
+        updateAge: 24 * 60 * 60, // 24 horas - reduce frecuencia de actualizaciones
     },
     jwt: {
         secret: "tu_jwt_secret_muy_seguro",
         maxAge: 8 * 60 * 60, // 8 horas
     },
+    events: {
+        async signIn(message) {
+            // Evento de login
+        },
+        async signOut(message) {
+            // Evento de logout
+        },
+        async session(message) {
+            // Reducir logging de sesiones
+        },
+    },
+    debug: false, // Desactivar debug en producción
 };
 
 export default NextAuth(authOptions);

@@ -14,7 +14,12 @@ export default function App({ Component, pageProps }) {
      <MantineProvider>
        <Notifications />
        <ErrorBoundary>
-         <SessionProvider session={pageProps.session}>
+         <SessionProvider 
+           session={pageProps.session}
+           refetchInterval={0}
+           refetchOnWindowFocus={false}
+           refetchWhenOffline={false}
+         >
            <Component {...pageProps} />
          </SessionProvider>
        </ErrorBoundary>
