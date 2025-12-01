@@ -362,7 +362,7 @@ const Inventario = () => {
        
         <Grid mt={20}>
           <Grid.Col span={12}>
-            <Title order={1}>Inventario</Title>
+            <Title order={1}>Productos</Title>
             <Text c="dimmed" order={4}>
               Registro detallado de sus productos
             </Text>
@@ -370,7 +370,7 @@ const Inventario = () => {
 
           <Grid.Col mt={20} span={12}>
             <Button variant="outline" color="#EE0E0F" onClick={() => setOpened(true)}>
-              Crear un Producto
+              Nuevo Producto
             </Button>
           </Grid.Col>
 

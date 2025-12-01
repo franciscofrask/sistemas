@@ -22,7 +22,7 @@ export function useFuncionalidades() {
             // Construir URL con parámetro para filtrar por rol si hay sesión
             const url = session?.user?.token 
                 ? '/api/funcionalidades?filtrar_por_rol=true'
-                : '/api/funcionalidades';
+                : '';
             
             const headers = {
                 'Content-Type': 'application/json'
