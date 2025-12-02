@@ -15,7 +15,10 @@ export default async function handler(req, res) {
     try {
         connection = await service_DBconn();
         
-        const productos = await service_ObtenerProductosConStock(connection);
+        // Obtener el parámetro almacen_id de la query string
+        const almacenId = req.query.almacen_id ? parseInt(req.query.almacen_id) : null;
+        
+        const productos = await service_ObtenerProductosConStock(connection, almacenId);
         
         return res.status(200).json({
             success: true,

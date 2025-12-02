@@ -71,7 +71,25 @@ const Inventario = () => {
   const fetchProductos = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/stock/productos/inventario');
+      
+      // Obtener almacén seleccionado del localStorage
+      let almacenId = null;
+      try {
+        const almacenGuardado = localStorage.getItem('almacen_seleccionado')??  NULL;
+        if (almacenGuardado) {
+          const almacen = JSON.parse(almacenGuardado);
+          almacenId = almacen.id;
+        }
+      } catch (error) {
+        console.error('Error al obtener almacén del localStorage:', error);
+      }
+      
+      // Construir URL con parámetro de almacén
+      const url = almacenId 
+        ? `/api/stock/productos/inventario?almacen_id=${almacenId}`
+        : '/api/stock/productos/inventario';
+      
+      const response = await fetch(url);
       
       // Verificar si la respuesta es exitosa
       if (!response.ok) {
