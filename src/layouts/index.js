@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   AppShell,
   Container,
@@ -16,6 +16,7 @@ import {
   Menu,
   Avatar,
   Divider,
+  Select,
 } from "@mantine/core";
 import {
   IconLayoutSidebarLeftCollapse,
@@ -24,6 +25,8 @@ import {
   IconLogout,
   IconSettings,
   IconChevronDown,
+  IconBuildingWarehouse,
+  IconCheck,
 } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
 import { usePathname, useRouter } from "next/navigation";
@@ -43,6 +46,11 @@ export function LayoutBase({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, status } = useStableSession();
+  
+  // Estados para almacenes
+  const [almacenes, setAlmacenes] = useState([]);
+  const [almacenSeleccionado, setAlmacenSeleccionado] = useState(null);
+  const [loadingAlmacenes, setLoadingAlmacenes] = useState(false);
 
   // Hook para manejo global de errores
   useErrorHandler();
@@ -58,6 +66,8 @@ export function LayoutBase({ children }) {
   // Función para cerrar sesión
   const handleLogout = async () => {
     try {
+      // Limpiar almacén seleccionado al cerrar sesión
+      localStorage.removeItem('almacen_seleccionado');
       await signOut({ 
         callbackUrl: '/autenticacion/ingresar',
         redirect: true 
@@ -68,6 +78,72 @@ export function LayoutBase({ children }) {
       router.push('/autenticacion/ingresar');
     }
   };
+
+  // Cargar almacenes disponibles (solo activos para el menú)
+  const cargarAlmacenes = async () => {
+    if (!session?.user?.token) return;
+    
+    setLoadingAlmacenes(true);
+    try {
+      const response = await fetch('/api/stock/almacenes?solo_activos=1', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.user.token}`
+        }
+      });
+      
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setAlmacenes(result.data || []);
+        
+        // Verificar si hay un almacén guardado en localStorage
+        const almacenGuardado = localStorage.getItem('almacen_seleccionado');
+        if (almacenGuardado) {
+          try {
+            const almacen = JSON.parse(almacenGuardado);
+            // Verificar que el almacén aún existe en la lista
+            const almacenExiste = result.data.find(a => a.id === almacen.id);
+            if (almacenExiste) {
+              setAlmacenSeleccionado(almacen);
+            } else {
+              // Si no existe, limpiar localStorage
+              localStorage.removeItem('almacen_seleccionado');
+            }
+          } catch (error) {
+            // Si hay error parseando, limpiar localStorage
+            localStorage.removeItem('almacen_seleccionado');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error al cargar almacenes:', error);
+    }
+    setLoadingAlmacenes(false);
+  };
+
+  // Función para seleccionar almacén
+  const seleccionarAlmacen = (almacenId) => {
+    if (!almacenId) {
+      // Deseleccionar almacén
+      setAlmacenSeleccionado(null);
+      localStorage.removeItem('almacen_seleccionado');
+    } else {
+      // Buscar el almacén en la lista
+      const almacen = almacenes.find(a => a.id.toString() === almacenId.toString());
+      if (almacen) {
+        setAlmacenSeleccionado(almacen);
+        localStorage.setItem('almacen_seleccionado', JSON.stringify(almacen));
+      }
+    }
+  };
+
+  // Cargar almacenes cuando la sesión esté lista
+  useEffect(() => {
+    if (session?.user?.token) {
+      cargarAlmacenes();
+    }
+  }, [session]);
 
   // Mostrar loader mientras verifica la sesión
   if (status === "loading") {
@@ -202,7 +278,7 @@ export function LayoutBase({ children }) {
                       {session?.user?.nombre?.split(' ')[0] || 'Usuario'}
                     </Text>
                     <Text size="xs" c="gray.4" truncate>
-                      {session?.user?.role || 'admin@sistema.com'}
+                      {almacenSeleccionado ? `📦 ${almacenSeleccionado.nombre}` : 'Sin almacén seleccionado'}
                     </Text>
                   </div>
                   <IconChevronDown size={14} color="rgba(255, 255, 255, 0.7)" />
@@ -237,6 +313,34 @@ export function LayoutBase({ children }) {
                   <Text size="sm">Configuración</Text>
                   <Text size="xs" c="dimmed">Próximamente</Text>
                 </div>
+              </Menu.Item>
+              
+              <Menu.Divider />
+              
+              {/* Sección de selección de almacén */}
+              <Menu.Label>
+                <Text size="xs" fw={600} c="dimmed">
+                  Almacén de trabajo
+                </Text>
+              </Menu.Label>
+              
+              <Menu.Item closeMenuOnClick={false}>
+                <Select
+                  placeholder="Seleccionar almacén..."
+                  value={almacenSeleccionado?.id?.toString() || null}
+                  onChange={seleccionarAlmacen}
+                  data={almacenes.map(almacen => ({
+                    value: almacen.id.toString(),
+                    label: almacen.nombre,
+                    description: almacen.direccion || 'Sin dirección'
+                  }))}
+                  clearable
+                  disabled={loadingAlmacenes}
+                  size="sm"
+                  style={{ width: '100%' }}
+                  searchable
+                  nothingFoundMessage="No hay almacenes disponibles"
+                />
               </Menu.Item>
               
               <Menu.Divider />
