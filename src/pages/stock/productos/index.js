@@ -53,6 +53,13 @@ const Inventario = () => {
   const [busqueda, setBusqueda] = useState("");
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
+  
+  // Estados para modal de stock por almacenes
+  const [modalStockAbierto, setModalStockAbierto] = useState(false);
+  const [stockPorAlmacenes, setStockPorAlmacenes] = useState([]);
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null);
+  const [loadingStock, setLoadingStock] = useState(false);
+  const [almacenes, setAlmacenes] = useState([]);
 
   const form = useForm({
     initialValues: {
@@ -75,7 +82,7 @@ const Inventario = () => {
       // Obtener almacén seleccionado del localStorage
       let almacenId = null;
       try {
-        const almacenGuardado = localStorage.getItem('almacen_seleccionado')??  NULL;
+        const almacenGuardado = localStorage.getItem('almacen_seleccionado')??  null;
         if (almacenGuardado) {
           const almacen = JSON.parse(almacenGuardado);
           almacenId = almacen.id;
@@ -104,6 +111,7 @@ const Inventario = () => {
       
       const data = await response.json();
       
+      
       if (data.success) {
         setProductos(Array.isArray(data.data) ? data.data : []);
       } else {
@@ -121,7 +129,54 @@ const Inventario = () => {
   // Cargar productos al montar el componente
   useEffect(() => {
     fetchProductos();
+    cargarAlmacenes();
   }, []);
+
+  // Función para cargar lista de almacenes
+  const cargarAlmacenes = async () => {
+    try {
+      const response = await fetch('/api/stock/almacenes?solo_activos=0');
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setAlmacenes(result.data || []);
+      }
+    } catch (error) {
+      console.error('Error al cargar almacenes:', error);
+    }
+  };
+
+  // Función para obtener stock por almacenes de un producto
+  const fetchStockPorAlmacenes = async (productoId) => {
+    setLoadingStock(true);
+    try {
+      const response = await fetch(`/api/stock/productos/almacenes-stock?producto_id=${productoId}`);
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setStockPorAlmacenes(result.data || []);
+      } else {
+        console.error('Error al obtener stock por almacenes:', result.message);
+        setStockPorAlmacenes([]);
+      }
+    } catch (error) {
+      console.error('Error de conexión:', error);
+      setStockPorAlmacenes([]);
+    } finally {
+      setLoadingStock(false);
+    }
+  };
+
+  // Función para manejar click en stock total
+  const handleVerStockPorAlmacenes = (producto) => {
+    setProductoSeleccionado(producto);
+    setModalStockAbierto(true);
+    fetchStockPorAlmacenes(producto.id);
+  };
+
+  // Función para obtener nombre de almacén por ID
+  const getNombreAlmacen = (almacenId) => {
+    const almacen = almacenes.find(a => a.id === almacenId);
+    return almacen ? almacen.nombre : `Almacén ID: ${almacenId}`;
+  };
 
   // Filtrar productos según búsqueda
   const productosFiltrados = Array.isArray(productos)
@@ -322,7 +377,12 @@ const Inventario = () => {
                         {item.es_servicio ? (
                           <Text c="dimmed" size="sm">—</Text>
                         ) : (
-                          <Text c={parseFloat(item.stock_total) === 0 ? "red" : "green"}>
+                          <Text 
+                            c={parseInt(item.stock_total || 0) === 0 ? "red" : "green"}
+                            style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                            onClick={() => handleVerStockPorAlmacenes(item)}
+                            title="Ver stock por almacenes"
+                          >
                             {parseInt(item.stock_total || 0)}
                           </Text>
                         )}
@@ -507,6 +567,89 @@ const Inventario = () => {
                   </Grid.Col>
                 </Grid>
               </Card>
+            </Stack>
+          )}
+        </Modal>
+
+        {/* Modal para ver stock por almacenes */}
+        <Modal
+          opened={modalStockAbierto}
+          onClose={() => setModalStockAbierto(false)}
+          title={`Stock por Almacén - ${productoSeleccionado?.nombre || 'Producto'}`}
+          size="lg"
+          transitionProps={{ transition: "fade", duration: 200 }}
+        >
+          {loadingStock ? (
+            <Group justify="center" py="xl">
+              <Loader />
+              <Text>Cargando stock por almacenes...</Text>
+            </Group>
+          ) : (
+            <Stack gap="md">
+              {stockPorAlmacenes.length > 0 ? (
+                <>
+                  <Text size="sm" c="dimmed">
+                    Distribución de stock del producto en los diferentes almacenes
+                  </Text>
+                  <Table striped highlightOnHover withColumnBorders>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Almacén</Table.Th>
+                        <Table.Th style={{ textAlign: 'center' }}>Stock Disponible</Table.Th>
+                        <Table.Th style={{ textAlign: 'center' }}>Estado</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {stockPorAlmacenes.map((item, index) => (
+                        <Table.Tr key={index}>
+                          <Table.Td>
+                            <Text fw={500}>
+                              {getNombreAlmacen(item.almacen_id)}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td style={{ textAlign: 'center' }}>
+                            <Text 
+                              c={parseInt(item.stock || 0) === 0 ? "red" : "green"}
+                              fw={500}
+                            >
+                              {parseInt(item.stock || 0)}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td style={{ textAlign: 'center' }}>
+                            <Badge 
+                              color={parseInt(item.stock || 0) === 0 ? "red" : "green"}
+                              variant="light"
+                              size="sm"
+                            >
+                              {parseInt(item.stock || 0) === 0 ? 'Sin stock' : 'Disponible'}
+                            </Badge>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                  <Card withBorder p="xs" style={{ backgroundColor: '#f8f9fa' }}>
+                    <Group justify="space-between">
+                      <Text size="sm" fw={500}>Total General:</Text>
+                      <Text size="sm" fw={600} c="blue">
+                        {stockPorAlmacenes.reduce((total, item) => total + parseInt(item.stock || 0), 0)} unidades
+                      </Text>
+                    </Group>
+                  </Card>
+                </>
+              ) : (
+                <Card withBorder p="xl" style={{ textAlign: 'center' }}>
+                  <Text size="lg" c="dimmed">
+                    📦
+                  </Text>
+                  <Text size="md" fw={500} mt="xs">
+                    Sin stock en almacenes
+                  </Text>
+                  <Text size="sm" c="dimmed">
+                    Este producto no tiene stock registrado en ningún almacén
+                  </Text>
+                </Card>
+              )}
             </Stack>
           )}
         </Modal>
