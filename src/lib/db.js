@@ -13,3 +13,7 @@ export const db = {
     }
   }
 };
+
+export async function getConnection() {
+  return await service_DBconn();
+}

@@ -25,6 +25,7 @@ import {
 } from "@mantine/core";
 
 import { useForm } from "@mantine/form";
+import { notifications } from "@mantine/notifications";
 import {
   IconSearch,
   IconPencil,
@@ -37,6 +38,7 @@ import {
   IconChevronUp,
   IconChevronDown,
   IconSelector,
+  IconPlus,
 } from "@tabler/icons-react";
 
 const rowsPerPage = 5;
@@ -60,17 +62,31 @@ const Inventario = () => {
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [loadingStock, setLoadingStock] = useState(false);
   const [almacenes, setAlmacenes] = useState([]);
+  
+  // Estados para formulario de productos
+  const [categorias, setCategorias] = useState([]);
+  const [unidades, setUnidades] = useState([]);
+  const [tipoControl, setTipoControl] = useState('UNIDAD');
+  const [esServicio, setEsServicio] = useState(false);
+  const [lotes, setLotes] = useState([{ codigo: '', fechaVencimiento: '', cantidad: 0 }]);
+  const [series, setSeries] = useState(['']);
 
   const form = useForm({
     initialValues: {
       nombre: "",
-      marca: "",
-      codigo_producto: "",
-      descripcion: "",
+      sku: "",
+      codigo_barras: "",
+      categoria_id: "",
+      unidad_medida_id: "",
+      tipo_control_stock: "UNIDAD",
+      es_servicio: false,
       precio_lista: 0,
     },
     validate: {
       nombre: value => (value.length < 2 ? "El nombre es obligatorio" : null),
+      categoria_id: value => (!value ? "La categoría es obligatoria" : null),
+      unidad_medida_id: value => (!value ? "La unidad de medida es obligatoria" : null),
+      precio_lista: value => (value < 0 ? "El precio debe ser mayor o igual a 0" : null),
     },
   });
 
@@ -130,9 +146,91 @@ const Inventario = () => {
   useEffect(() => {
     fetchProductos();
     cargarAlmacenes();
+    cargarCategorias();
+    cargarUnidades();
   }, []);
 
-  // Función para cargar lista de almacenes
+  // Función para cargar categorías
+  const cargarCategorias = async () => {
+    try {
+      const response = await fetch('/api/stock/productos/categorias');
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setCategorias(result.data || []);
+      } else {
+        console.error('Error al cargar categorías:', result.message);
+      }
+    } catch (error) {
+      console.error('Error al cargar categorías:', error);
+    }
+  };
+
+  // Función para cargar unidades de medida
+  const cargarUnidades = async () => {
+    try {
+      const response = await fetch('/api/stock/productos/unidades');
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setUnidades(result.data || []);
+      } else {
+        console.error('Error al cargar unidades:', result.message);
+      }
+    } catch (error) {
+      console.error('Error al cargar unidades:', error);
+    }
+  };
+
+  // Efecto para manejar cambio en 'es servicio'
+  useEffect(() => {
+    if (esServicio) {
+      setTipoControl('UNIDAD');
+      form.setFieldValue('tipo_control_stock', 'UNIDAD');
+    }
+  }, [esServicio]);
+
+  // Efecto para sincronizar tipo de control
+  useEffect(() => {
+    form.setFieldValue('tipo_control_stock', tipoControl);
+  }, [tipoControl]);
+
+  // Efecto para sincronizar es servicio
+  useEffect(() => {
+    form.setFieldValue('es_servicio', esServicio);
+  }, [esServicio]);
+
+  // Funciones para manejar lotes
+  const agregarLote = () => {
+    setLotes([...lotes, { codigo: '', fechaVencimiento: '', cantidad: 0 }]);
+  };
+
+  const eliminarLote = (index) => {
+    if (lotes.length > 1) {
+      setLotes(lotes.filter((_, i) => i !== index));
+    }
+  };
+
+  const actualizarLote = (index, campo, valor) => {
+    const nuevosLotes = [...lotes];
+    nuevosLotes[index][campo] = valor;
+    setLotes(nuevosLotes);
+  };
+
+  // Funciones para manejar series
+  const agregarSerie = () => {
+    setSeries([...series, '']);
+  };
+
+  const eliminarSerie = (index) => {
+    if (series.length > 1) {
+      setSeries(series.filter((_, i) => i !== index));
+    }
+  };
+
+  const actualizarSerie = (index, valor) => {
+    const nuevasSeries = [...series];
+    nuevasSeries[index] = valor;
+    setSeries(nuevasSeries);
+  };
   const cargarAlmacenes = async () => {
     try {
       const response = await fetch('/api/stock/almacenes?solo_activos=0');
@@ -272,12 +370,95 @@ const Inventario = () => {
     setOpened(true);
   };
 
-  const handleSubmit = values => {
-    console.log("Submit:", values);
+  const handleSubmit = async (values) => {
+    try {
+      // Preparar datos del producto según el tipo de control
+      const datosProducto = {
+        ...values,
+        es_servicio: esServicio
+      };
+
+      // Agregar datos específicos según el tipo de control de stock
+      if (tipoControl === 'LOTE') {
+        const lotesValidos = lotes.filter(l => l.codigo && l.cantidad > 0);
+        if (lotesValidos.length === 0) {
+          notifications.show({
+            title: 'Error',
+            message: 'Debe agregar al menos un lote válido',
+            color: 'red'
+          });
+          return;
+        }
+        datosProducto.lotes = lotesValidos.map(l => ({
+          codigo_lote: l.codigo,
+          fecha_venc: l.fechaVencimiento || null,
+          cantidad: parseFloat(l.cantidad)
+        }));
+        datosProducto.almacen_id = values.almacen_id;
+
+      } else if (tipoControl === 'SERIE') {
+        const seriesValidas = series.filter(s => s.trim());
+        if (seriesValidas.length === 0) {
+          notifications.show({
+            title: 'Error',
+            message: 'Debe agregar al menos una serie válida',
+            color: 'red'
+          });
+          return;
+        }
+        datosProducto.series = seriesValidas;
+        datosProducto.almacen_id = values.almacen_id;
+      }
+
+      console.log('Enviando datos:', datosProducto);
+
+      // Enviar al API
+      const response = await fetch('/api/stock/productos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(datosProducto),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        notifications.show({
+          title: 'Éxito',
+          message: 'Producto creado exitosamente',
+          color: 'green'
+        });
+        
+        limpiarFormulario();
+        setOpened(false);
+        fetchProductos(); // Recargar la lista
+      } else {
+        notifications.show({
+          title: 'Error',
+          message: result.error || 'Error al crear el producto',
+          color: 'red'
+        });
+      }
+
+    } catch (error) {
+      console.error('Error al crear producto:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Error de conexión al crear el producto',
+        color: 'red'
+      });
+    }
   };
 
-  const handleDelete = id => {
-    console.log("Delete:", id);
+  const limpiarFormulario = () => {
+    form.reset();
+    setTipoControl('UNIDAD');
+    setEsServicio(false);
+    setLotes([{ codigo: '', fechaVencimiento: '', cantidad: 0 }]);
+    setSeries(['']);
+    setModoEdicion(false);
+    setProductoEditandoId(null);
   };
 
   return (
@@ -429,6 +610,14 @@ const Inventario = () => {
                               </ActionIcon>
                             </Menu.Target>
                               <Menu.Dropdown>
+                                <Menu.Item 
+                                  leftSection={<IconPlus size={14} />} 
+                                  onClick={() => setOpened(true)}
+                                  color="green"
+                                >
+                                  Agregar Producto
+                                </Menu.Item>
+                                <Menu.Divider />
                                 <Menu.Item leftSection={<IconEye size={14} />} onClick={() => handleVerDetalle(item)}>
                                   Ver detalles
                                 </Menu.Item>
@@ -476,9 +665,7 @@ const Inventario = () => {
           opened={opened}
           onClose={() => {
             setOpened(false);
-            form.reset();
-            setModoEdicion(false);
-            setProductoEditandoId(null);
+            limpiarFormulario();
           }}
           title={modoEdicion ? "Editar Producto" : "Crear Producto"}
           size="lg"
@@ -493,30 +680,194 @@ const Inventario = () => {
               <Grid.Col span={12}>
                 <Title order={4}>Información del Producto</Title>
               </Grid.Col>
-              <Grid.Col span={6}>
-                <TextInput label="Nombre" {...form.getInputProps("nombre")} />
+              
+              {/* Información básica */}
+              <Grid.Col span={12}>
+                <TextInput 
+                  label="Nombre del producto" 
+                  placeholder="Ingrese el nombre del producto"
+                  required
+                  {...form.getInputProps("nombre")} 
+                />
               </Grid.Col>
+              
               <Grid.Col span={6}>
-                <TextInput label="Marca" {...form.getInputProps("marca")} />
+                <TextInput 
+                  label="SKU" 
+                  placeholder="Código SKU (único)"
+                  {...form.getInputProps("sku")} 
+                />
               </Grid.Col>
+              
               <Grid.Col span={6}>
-                <TextInput label="Código" {...form.getInputProps("codigo_producto")} />
+                <TextInput 
+                  label="Código de barras" 
+                  placeholder="Código de barras (único)"
+                  {...form.getInputProps("codigo_barras")} 
+                />
               </Grid.Col>
+              
+              <Grid.Col span={6}>
+                <Select
+                  label="Categoría"
+                  placeholder="Seleccione una categoría"
+                  required
+                  data={categorias.map(cat => ({ 
+                    value: cat.id.toString(), 
+                    label: cat.nombre,
+                    description: cat.descripcion
+                  }))}
+                  {...form.getInputProps("categoria_id")}
+                  searchable
+                  maxDropdownHeight={200}
+                />
+              </Grid.Col>
+              
+              <Grid.Col span={6}>
+                <Select
+                  label="Unidad de medida"
+                  placeholder="Seleccione unidad"
+                  required
+                  data={unidades.map(unidad => ({ 
+                    value: unidad.id.toString(), 
+                    label: `${unidad.nombre} (${unidad.codigo})`,
+                    description: `Código: ${unidad.codigo}`
+                  }))}
+                  {...form.getInputProps("unidad_medida_id")}
+                  searchable
+                  maxDropdownHeight={200}
+                />
+              </Grid.Col>
+              
               <Grid.Col span={6}>
                 <NumberInput
-                  label="Precio Lista"
+                  label="Precio de lista"
                   prefix="$"
+                  min={0}
+                  decimalScale={2}
                   {...form.getInputProps("precio_lista")}
                 />
               </Grid.Col>
-              <Grid.Col span={12}>
-                <Textarea
-                  label="Descripción"
-                  autosize
-                  minRows={3}
-                  {...form.getInputProps("descripcion")}
+              
+              <Grid.Col span={6}>
+                <Checkbox
+                  label="¿Es un servicio?"
+                  checked={esServicio}
+                  onChange={(e) => setEsServicio(e.currentTarget.checked)}
                 />
               </Grid.Col>
+              
+              <Grid.Col span={12}>
+                <Select
+                  label="Tipo de control de stock"
+                  value={tipoControl}
+                  onChange={setTipoControl}
+                  disabled={esServicio}
+                  data={[
+                    { value: 'UNIDAD', label: 'UNIDAD' },
+                    { value: 'LOTE', label: 'LOTE' },
+                    { value: 'SERIE', label: 'SERIE' }
+                  ]}
+                />
+                {esServicio && (
+                  <Text size="xs" c="dimmed" mt={5}>
+                    Los servicios siempre usan control por UNIDAD
+                  </Text>
+                )}
+              </Grid.Col>
+              
+              {/* Campos específicos según tipo de control */}
+              {(tipoControl === 'LOTE' || tipoControl === 'SERIE') && !esServicio && (
+                <Grid.Col span={12}>
+                  <Select
+                    label="Almacén"
+                    placeholder="Seleccione el almacén donde se registrará el stock inicial"
+                    data={almacenes.map(a => ({ value: a.id.toString(), label: a.nombre }))}
+                    required
+                    {...form.getInputProps("almacen_id")}
+                  />
+                </Grid.Col>
+              )}
+              
+              {tipoControl === 'LOTE' && !esServicio && (
+                <Grid.Col span={12}>
+                  <Title order={5} mb="md">Configuración de Lotes</Title>
+                  {lotes.map((lote, index) => (
+                    <Card key={index} mb="md" withBorder>
+                      <Grid>
+                        <Grid.Col span={4}>
+                          <TextInput
+                            label="Código del lote"
+                            placeholder="Ej: LT001"
+                            value={lote.codigo}
+                            onChange={(e) => actualizarLote(index, 'codigo', e.currentTarget.value)}
+                          />
+                        </Grid.Col>
+                        <Grid.Col span={4}>
+                          <TextInput
+                            label="Fecha de vencimiento"
+                            type="date"
+                            value={lote.fechaVencimiento}
+                            onChange={(e) => actualizarLote(index, 'fechaVencimiento', e.currentTarget.value)}
+                          />
+                        </Grid.Col>
+                        <Grid.Col span={3}>
+                          <NumberInput
+                            label="Cantidad inicial"
+                            min={0}
+                            value={lote.cantidad}
+                            onChange={(value) => actualizarLote(index, 'cantidad', value || 0)}
+                          />
+                        </Grid.Col>
+                        <Grid.Col span={1}>
+                          <Button
+                            color="red"
+                            variant="subtle"
+                            size="sm"
+                            mt="xl"
+                            onClick={() => eliminarLote(index)}
+                            disabled={lotes.length === 1}
+                          >
+                            ×
+                          </Button>
+                        </Grid.Col>
+                      </Grid>
+                    </Card>
+                  ))}
+                  <Button variant="light" onClick={agregarLote} size="sm">
+                    + Agregar Lote
+                  </Button>
+                </Grid.Col>
+              )}
+              
+              {tipoControl === 'SERIE' && !esServicio && (
+                <Grid.Col span={12}>
+                  <Title order={5} mb="md">Números de Serie</Title>
+                  {series.map((serie, index) => (
+                    <Group key={index} mb="xs">
+                      <TextInput
+                        placeholder={`Serie ${index + 1}`}
+                        value={serie}
+                        onChange={(e) => actualizarSerie(index, e.currentTarget.value)}
+                        style={{ flex: 1 }}
+                      />
+                      <Button
+                        color="red"
+                        variant="subtle"
+                        size="sm"
+                        onClick={() => eliminarSerie(index)}
+                        disabled={series.length === 1}
+                      >
+                        ×
+                      </Button>
+                    </Group>
+                  ))}
+                  <Button variant="light" onClick={agregarSerie} size="sm">
+                    + Agregar Serie
+                  </Button>
+                </Grid.Col>
+              )}
+              
               <Grid.Col span={12}>
                 <Button variant="outline" color="#EE0E0F" type="submit" fullWidth>
                   {modoEdicion ? "Guardar cambios" : "Crear Producto"}
