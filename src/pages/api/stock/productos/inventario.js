@@ -17,9 +17,11 @@ export default async function handler(req, res) {
         
         // Obtener el parámetro almacen_id de la query string
         const almacenId = req.query.almacen_id ? parseInt(req.query.almacen_id) : null;
+        console.log('Almacen ID recibido en API inventario productos:', almacenId);
         
         const productos = await service_ObtenerProductosConStock(connection, almacenId);
-        
+   
+         
         return res.status(200).json({
             success: true,
             data: productos

@@ -5,6 +5,7 @@ export async function service_ObtenerProductosConStock(_db, almacenId = null) {
         // Usar el procedimiento almacenado para obtener productos con stock total
         // Siempre pasamos un parámetro: almacenId o NULL
         const [rows] = await _db.execute('CALL sp_get_productos_con_stock_total(?)', [almacenId]);
+      
         return rows[0];
     } catch (err) {
         console.error('Error en service_ObtenerProductosConStock:', err);
@@ -115,5 +116,74 @@ export async function service_ListarCategoriasProducto(_db) {
     } catch (err) {
         console.error('Error en service_ListarCategoriasProducto:', err);
         throw new Error('Error obteniendo categorías de productos: ' + err.message);
+    }
+}
+
+export async function service_RegistrarMovimientoStock(_db, movimientoData) {
+    try {
+        const {
+            producto_id, almacen_id, tipo_movimiento, origen,
+            documento_tipo, documento_id, cantidad, lote_id, serie_id
+        } = movimientoData;
+        
+        // Ejecutar el procedimiento almacenado para registrar movimiento de stock
+        await _db.execute(
+            'CALL sp_registrar_movimiento_stock(?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [producto_id, almacen_id, tipo_movimiento, origen, documento_tipo, 
+             documento_id, cantidad, lote_id, serie_id]
+        );
+        
+        return true;
+    } catch (err) {
+        console.error('Error en service_RegistrarMovimientoStock:', err);
+        throw new Error('Error registrando movimiento de stock: ' + err.message);
+    }
+}
+
+export async function service_ListarLotesProducto(_db, productoId) {
+    try {
+        // Obtener lotes existentes para un producto
+        const [rows] = await _db.execute(
+            'SELECT * FROM lotes WHERE producto_id = ? ORDER BY fecha_vencimiento ASC',
+            [productoId]
+        );
+        return rows;
+    } catch (err) {
+        console.error('Error en service_ListarLotesProducto:', err);
+        throw new Error('Error obteniendo lotes del producto: ' + err.message);
+    }
+}
+
+export async function service_CrearLote(_db, loteData) {
+    try {
+        const { producto_id, codigo_lote, fecha_vencimiento } = loteData;
+        
+        // Crear nuevo lote
+        const [result] = await _db.execute(
+            'INSERT INTO lotes (producto_id, codigo_lote, fecha_vencimiento) VALUES (?, ?, ?)',
+            [producto_id, codigo_lote, fecha_vencimiento]
+        );
+        
+        return result.insertId;
+    } catch (err) {
+        console.error('Error en service_CrearLote:', err);
+        throw new Error('Error creando lote: ' + err.message);
+    }
+}
+
+export async function service_CrearSerie(_db, serieData) {
+    try {
+        const { producto_id, numero_serie } = serieData;
+        
+        // Crear nueva serie
+        const [result] = await _db.execute(
+            'INSERT INTO series (producto_id, numero_serie) VALUES (?, ?)',
+            [producto_id, numero_serie]
+        );
+        
+        return result.insertId;
+    } catch (err) {
+        console.error('Error en service_CrearSerie:', err);
+        throw new Error('Error creando serie: ' + err.message);
     }
 }

@@ -4,7 +4,6 @@ import ProductForm from "@/components/stock/ProductForm";
 import ProductsTable from "@/components/stock/ProductsTable";
 import StockModal from "@/components/stock/StockModal";
 import ProductDetailModal from "@/components/stock/ProductDetailModal";
-import AddStockModal from "@/components/stock/AddStockModal";
 import {
   Button,
   Container,
@@ -49,10 +48,6 @@ const Inventario = () => {
   const [lotes, setLotes] = useState([{ codigo: '', fechaVencimiento: '', cantidad: 0 }]);
   const [series, setSeries] = useState(['']);
 
-  // Estados para modal de agregar stock
-  const [modalAgregarStock, setModalAgregarStock] = useState(false);
-  const [productoParaStock, setProductoParaStock] = useState(null);
-
   const form = useForm({
     initialValues: {
       nombre: "",
@@ -79,7 +74,7 @@ const Inventario = () => {
       
       let almacenId = null;
       try {
-        const almacenGuardado = localStorage.getItem('almacen_seleccionado');
+        const almacenGuardado = localStorage.getItem('almacenSeleccionado');
         if (almacenGuardado) {
           const almacenData = JSON.parse(almacenGuardado);
           almacenId = almacenData.id;
@@ -365,16 +360,6 @@ const Inventario = () => {
     console.log('Eliminar producto:', productoId);
   };
 
-  const handleAgregarStock = (producto) => {
-    setProductoParaStock(producto);
-    setModalAgregarStock(true);
-  };
-
-  const onStockAdded = () => {
-    // Recargar productos después de agregar stock
-    fetchProductos();
-  };
-
   return (
     <ProtectedLayout>
       <Container size="lg">
@@ -416,8 +401,8 @@ const Inventario = () => {
               handleVerDetalle={handleVerDetalle}
               handleEdit={handleEdit}
               handleDelete={handleDelete}
+              setOpened={setOpened}
               getTipoControlBadge={getTipoControlBadge}
-              onAgregarStock={handleAgregarStock}
             />
             
             <Pagination
@@ -470,15 +455,6 @@ const Inventario = () => {
           setModalDetalleAbierto={setModalDetalleAbierto}
           productoDetalle={productoDetalle}
           getTipoControlBadge={getTipoControlBadge}
-        />
-
-        {/* Modal para agregar stock */}
-        <AddStockModal
-          opened={modalAgregarStock}
-          onClose={() => setModalAgregarStock(false)}
-          producto={productoParaStock}
-          almacenes={almacenes}
-          onStockAdded={onStockAdded}
         />
       </Container>
     </ProtectedLayout>
