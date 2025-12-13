@@ -13,11 +13,15 @@ import {
   TextInput,
   Title,
   Pagination,
+  Select,
+  Group,
+  Paper,
+  ActionIcon,
 } from "@mantine/core";
 
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
-import { IconSearch } from "@tabler/icons-react";
+import { IconSearch, IconFilter, IconFilterOff } from "@tabler/icons-react";
 
 const rowsPerPage = 5;
 
@@ -33,6 +37,12 @@ const Inventario = () => {
   const [busqueda, setBusqueda] = useState("");
   const [sortField, setSortField] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
+  
+  // Estados para filtros
+  const [filtroTipoControl, setFiltroTipoControl] = useState("");
+  const [filtroCategoria, setFiltroCategoria] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState(""); // Producto o Servicio
+  const [filtroStock, setFiltroStock] = useState(""); // Sin stock, Con stock, Todos
   
   // Estados para modal de stock por almacenes
   const [modalStockAbierto, setModalStockAbierto] = useState(false);
@@ -210,16 +220,35 @@ const Inventario = () => {
     return almacen ? almacen.nombre : `Almacén ID: ${almacenId}`;
   };
 
-  // Filtrar productos según búsqueda
+  // Filtrar productos según búsqueda y filtros
   const productosFiltrados = Array.isArray(productos)
-    ? productos.filter(
-        producto =>
+    ? productos.filter(producto => {
+        // Filtro por búsqueda
+        const coincideBusqueda = !busqueda || 
           producto.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
           producto.sku?.toLowerCase().includes(busqueda.toLowerCase()) ||
           producto.codigo_barras?.toLowerCase().includes(busqueda.toLowerCase()) ||
           producto.categoria_nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-          String(producto.stock_total || 0).includes(busqueda)
-      )
+          String(producto.stock_total || 0).includes(busqueda);
+        
+        // Filtro por tipo de control de stock
+        const coincideTipoControl = !filtroTipoControl || producto.tipo_control_stock === filtroTipoControl;
+        
+        // Filtro por categoría
+        const coincideCategoria = !filtroCategoria || String(producto.categoria_id) === filtroCategoria;
+        
+        // Filtro por tipo (Producto/Servicio)
+        const coincideTipo = !filtroTipo || 
+          (filtroTipo === "producto" && !producto.es_servicio) ||
+          (filtroTipo === "servicio" && producto.es_servicio);
+        
+        // Filtro por stock
+        const coincideStock = !filtroStock ||
+          (filtroStock === "sin_stock" && parseInt(producto.stock_total || 0) === 0) ||
+          (filtroStock === "con_stock" && parseInt(producto.stock_total || 0) > 0);
+        
+        return coincideBusqueda && coincideTipoControl && coincideCategoria && coincideTipo && coincideStock;
+      })
     : [];
 
   // Ordenar productos
@@ -266,6 +295,16 @@ const Inventario = () => {
     }
   };
 
+  // Función para limpiar todos los filtros
+  const limpiarFiltros = () => {
+    setBusqueda("");
+    setFiltroTipoControl("");
+    setFiltroCategoria("");
+    setFiltroTipo("");
+    setFiltroStock("");
+    setPageProductos(1);
+  };
+
   const handleSubmit = async (values) => {
     try {
       const datosProducto = {
@@ -292,14 +331,7 @@ const Inventario = () => {
 
       } else if (tipoControl === 'SERIE') {
         const seriesValidas = series.filter(s => s.trim());
-        if (seriesValidas.length === 0) {
-          notifications.show({
-            title: 'Error',
-            message: 'Debe agregar al menos una serie válida',
-            color: 'red'
-          });
-          return;
-        }
+       
         datosProducto.series = seriesValidas;
         datosProducto.almacen_id = values.almacen_id;
       }
@@ -393,15 +425,104 @@ const Inventario = () => {
           </Grid.Col>
 
           <Grid.Col mt={30} span={12}>
-            <TextInput
-              placeholder="Buscar productos..."
-              value={busqueda}
-              onChange={e => {
-                setBusqueda(e.currentTarget.value);
-                setPageProductos(1);
-              }}
-              leftSection={<IconSearch size={18} />}
-            />
+            <Paper p="md" withBorder>
+              <Group mb="md">
+                <Text fw={500} size="md">Filtros</Text>
+                <ActionIcon 
+                  variant="light" 
+                  color="gray" 
+                  onClick={limpiarFiltros}
+                  title="Limpiar filtros"
+                >
+                  <IconFilterOff size={16} />
+                </ActionIcon>
+              </Group>
+              
+              <Grid>
+                <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
+                  <TextInput
+                    placeholder="Buscar productos..."
+                    value={busqueda}
+                    onChange={e => {
+                      setBusqueda(e.currentTarget.value);
+                      setPageProductos(1);
+                    }}
+                    leftSection={<IconSearch size={18} />}
+                  />
+                </Grid.Col>
+                
+                <Grid.Col span={{ base: 12, md: 6, lg: 2 }}>
+                  <Select
+                    placeholder="Tipo de Control"
+                    data={[
+                      { value: "", label: "Todos" },
+                      { value: "UNIDAD", label: "Unidad" },
+                      { value: "LOTE", label: "Lote" },
+                      { value: "SERIE", label: "Serie" }
+                    ]}
+                    value={filtroTipoControl}
+                    onChange={(value) => {
+                      setFiltroTipoControl(value || "");
+                      setPageProductos(1);
+                    }}
+                    clearable
+                  />
+                </Grid.Col>
+                
+                <Grid.Col span={{ base: 12, md: 6, lg: 2 }}>
+                  <Select
+                    placeholder="Categoría"
+                    data={[
+                      { value: "", label: "Todas" },
+                      ...categorias.map(cat => ({
+                        value: String(cat.id),
+                        label: cat.nombre
+                      }))
+                    ]}
+                    value={filtroCategoria}
+                    onChange={(value) => {
+                      setFiltroCategoria(value || "");
+                      setPageProductos(1);
+                    }}
+                    clearable
+                  />
+                </Grid.Col>
+                
+                <Grid.Col span={{ base: 12, md: 6, lg: 2 }}>
+                  <Select
+                    placeholder="Tipo"
+                    data={[
+                      { value: "", label: "Todos" },
+                      { value: "producto", label: "Producto" },
+                      { value: "servicio", label: "Servicio" }
+                    ]}
+                    value={filtroTipo}
+                    onChange={(value) => {
+                      setFiltroTipo(value || "");
+                      setPageProductos(1);
+                    }}
+                    clearable
+                  />
+                </Grid.Col>
+                
+                <Grid.Col span={{ base: 12, md: 6, lg: 2 }}>
+                  <Select
+                    placeholder="Stock"
+                    data={[
+                      { value: "", label: "Todos" },
+                      { value: "con_stock", label: "Con Stock" },
+                      { value: "sin_stock", label: "Sin Stock" }
+                    ]}
+                    value={filtroStock}
+                    onChange={(value) => {
+                      setFiltroStock(value || "");
+                      setPageProductos(1);
+                    }}
+                    clearable
+                  />
+                </Grid.Col>
+              </Grid>
+            </Paper>
           </Grid.Col>
 
           <Grid.Col span={12}>

@@ -285,11 +285,11 @@ const ProductForm = ({
           
           {tipoControl === 'SERIE' && !esServicio && (
             <Grid.Col span={12}>
-              <Title order={5} mb="md">Números de Serie</Title>
+              <Title order={5} mb="md">Números de Serie (Opcional)</Title>
               {series.map((serie, index) => (
                 <Group key={index} mb="xs">
                   <TextInput
-                    placeholder={`Serie ${index + 1}`}
+                    placeholder={`Solo ingrese el número de serie si desea cargar una unidad con serie`}
                     value={serie}
                     onChange={(e) => actualizarSerie(index, e.currentTarget.value)}
                     style={{ flex: 1 }}

@@ -58,10 +58,12 @@ const AddStockModal = ({
   const [crearNuevoLote, setCrearNuevoLote] = useState(false);
   const [codigoLote, setCodigoLote] = useState('');
   const [fechaVencimiento, setFechaVencimiento] = useState('');
+  const [lotesExistentes, setLotesExistentes] = useState([]);
   
   // Estados para SERIE
   const [numeroSerie, setNumeroSerie] = useState('');
   const [seriesAgregadas, setSeriesAgregadas] = useState([]);
+  const [seriesExistentes, setSeriesExistentes] = useState([]);
 
   // Limpiar formulario al abrir/cerrar
   useEffect(() => {
@@ -94,6 +96,21 @@ const AddStockModal = ({
     setFechaVencimiento('');
     setNumeroSerie('');
     setSeriesAgregadas([]);
+    setSeriesExistentes([]);
+    
+    // Procesar series existentes si es tipo SERIE
+    if (producto && producto.tipo_control_stock === 'SERIE' && producto.numeros_serie) {
+      const seriesArray = producto.numeros_serie.split(',').map(serie => serie.trim()).filter(serie => serie);
+      setSeriesExistentes(seriesArray);
+    }
+    
+    // Procesar códigos de lote existentes si es tipo LOTE
+    if (producto && producto.tipo_control_stock === 'LOTE' && producto.codigos_lote) {
+      const lotesArray = producto.codigos_lote.split(',').map(lote => lote.trim()).filter(lote => lote);
+      setLotesExistentes(lotesArray);
+    } else {
+      setLotesExistentes([]);
+    }
   };
 
   const cargarLotesDisponibles = async () => {
@@ -119,11 +136,22 @@ const AddStockModal = ({
       return;
     }
 
+    // Validar que no exista en las series agregadas
     if (seriesAgregadas.includes(numeroSerie.trim())) {
       notifications.show({
         title: 'Error',
         message: 'Este número de serie ya fue agregado',
         color: 'red'
+      });
+      return;
+    }
+
+    // Validar que no exista en las series existentes
+    if (seriesExistentes.includes(numeroSerie.trim())) {
+      notifications.show({
+        title: 'Serie Existente',
+        message: 'Este número de serie ya existe para este producto',
+        color: 'orange'
       });
       return;
     }
@@ -160,11 +188,21 @@ const AddStockModal = ({
 
     } catch (error) {
       console.error('Error agregando stock:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Error al agregar stock al producto',
-        color: 'red'
-      });
+      
+      // Manejar errores de conexión
+      if (error.message.includes('fetch')) {
+        notifications.show({
+          title: 'Error de Conexión',
+          message: 'No se pudo conectar con el servidor. Verifique su conexión a internet.',
+          color: 'red'
+        });
+      } else {
+        notifications.show({
+          title: 'Error Inesperado',
+          message: 'Ocurrió un error inesperado al agregar stock. Inténtelo nuevamente.',
+          color: 'red'
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -204,7 +242,12 @@ const AddStockModal = ({
       onClose();
       onStockAdded();
     } else {
-      throw new Error(result.error || 'Error en el servidor');
+      notifications.show({
+        title: 'Error al Agregar Stock',
+        message: result.error || 'No se pudo agregar stock al producto. Inténtelo nuevamente.',
+        color: 'red'
+      });
+      return;
     }
   };
 
@@ -244,7 +287,22 @@ const AddStockModal = ({
       const resultLote = await responseLote.json();
       
       if (!responseLote.ok || !resultLote.success) {
-        throw new Error(resultLote.error || 'Error creando lote');
+        // Manejar errores específicos de lotes duplicados
+        if (resultLote.details && resultLote.details.includes('Duplicate entry') && resultLote.details.includes('uk_lotes_producto_codigo')) {
+          notifications.show({
+            title: 'Lote Duplicado',
+            message: 'Ya existe un lote con este código para este producto. Use un código diferente.',
+            color: 'red'
+          });
+          return;
+        }
+        
+        notifications.show({
+          title: 'Error al Crear Lote',
+          message: resultLote.error || 'No se pudo crear el lote. Verifique que el código sea único.',
+          color: 'red'
+        });
+        return;
       }
       
       loteId = resultLote.lote_id;
@@ -285,7 +343,12 @@ const AddStockModal = ({
       onClose();
       onStockAdded();
     } else {
-      throw new Error(result.error || 'Error en el servidor');
+      notifications.show({
+        title: 'Error en Movimiento de Lote',
+        message: result.error || 'No se pudo registrar el movimiento de stock para el lote.',
+        color: 'red'
+      });
+      return;
     }
   };
 
@@ -312,7 +375,23 @@ const AddStockModal = ({
     const resultSeries = await responseSeries.json();
     
     if (!responseSeries.ok || !resultSeries.success) {
-      throw new Error(resultSeries.error || 'Error creando series');
+      // Manejar errores específicos de series duplicadas
+      if (resultSeries.details && resultSeries.details.includes('Duplicate entry') && resultSeries.details.includes('uk_series_producto_numero')) {
+        notifications.show({
+          title: 'Serie Duplicada',
+          message: 'Una o más series ya existen para este producto. Por favor, use números de serie únicos.',
+          color: 'red'
+        });
+        return;
+      }
+      
+      // Otros errores de creación de series
+      notifications.show({
+        title: 'Error al Crear Series',
+        message: resultSeries.error || 'No se pudieron crear las series. Verifique que los números de serie sean únicos.',
+        color: 'red'
+      });
+      return;
     }
 
     // Crear movimientos de stock (uno por serie)
@@ -343,7 +422,12 @@ const AddStockModal = ({
       onClose();
       onStockAdded();
     } else {
-      throw new Error(resultMovimientos.error || 'Error en movimientos');
+      notifications.show({
+        title: 'Error en Movimientos',
+        message: resultMovimientos.error || 'No se pudo registrar el movimiento de stock para las series.',
+        color: 'red'
+      });
+      return;
     }
   };
 
@@ -392,6 +476,28 @@ const AddStockModal = ({
         {/* TIPO LOTE */}
         {producto.tipo_control_stock === 'LOTE' && (
           <>
+            {/* Mostrar lotes existentes si los hay */}
+            {lotesExistentes.length > 0 && (
+              <Grid.Col span={12}>
+                <Card withBorder p="sm">
+                  <Text size="sm" fw={500} mb="xs" c="blue">Códigos de lote existentes:</Text>
+                  <div style={{ maxHeight: '100px', overflowY: 'auto' }}>
+                    {lotesExistentes.map((lote, index) => (
+                      <Badge 
+                        key={index} 
+                        variant="light" 
+                        color="blue" 
+                        size="sm" 
+                        style={{ marginRight: '4px', marginBottom: '4px' }}
+                      >
+                        {lote}
+                      </Badge>
+                    ))}
+                  </div>
+                </Card>
+              </Grid.Col>
+            )}
+            
             <Grid.Col span={12}>
               <Group>
                 <Button
@@ -483,9 +589,31 @@ const AddStockModal = ({
               </Group>
             </Grid.Col>
 
+            {/* Mostrar series existentes si las hay */}
+            {seriesExistentes.length > 0 && (
+              <Grid.Col span={12}>
+                <Card withBorder p="sm">
+                  <Text size="sm" fw={500} mb="xs" c="blue">Series existentes:</Text>
+                  <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                    {seriesExistentes.map((serie, index) => (
+                      <Badge 
+                        key={index} 
+                        variant="light" 
+                        color="blue" 
+                        size="sm" 
+                        style={{ marginRight: '4px', marginBottom: '4px' }}
+                      >
+                        {serie}
+                      </Badge>
+                    ))}
+                  </div>
+                </Card>
+              </Grid.Col>
+            )}
+
             {seriesAgregadas.length > 0 && (
               <Grid.Col span={12}>
-                <Text size="sm" fw={500} mb="xs">Series agregadas:</Text>
+                <Text size="sm" fw={500} mb="xs" c="green">Nuevas series a agregar:</Text>
                 <Table size="sm" withTableBorder>
                   <Table.Thead>
                     <Table.Tr>

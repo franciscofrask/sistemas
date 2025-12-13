@@ -70,12 +70,7 @@ export default async function handler(req, res) {
             }
 
         } else if (tipo_control_stock === 'SERIE') {
-            if (!series || series.length === 0) {
-                await connection.rollback();
-                return res.status(400).json({
-                    error: 'Para productos tipo SERIE se requieren números de serie'
-                });
-            }
+          
 
             if (!almacen_id) {
                 await connection.rollback();
