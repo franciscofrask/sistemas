@@ -5,6 +5,7 @@ import ProductsTable from "@/components/stock/ProductsTable";
 import StockModal from "@/components/stock/StockModal";
 import ProductDetailModal from "@/components/stock/ProductDetailModal";
 import AddStockModal from "@/components/stock/AddStockModal";
+import ProductDetailDrawer from "@/components/stock/ProductDetailDrawer";
 import {
   Button,
   Container,
@@ -33,6 +34,7 @@ const Inventario = () => {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [productoEditandoId, setProductoEditandoId] = useState(null);
   const [modalDetalleAbierto, setModalDetalleAbierto] = useState(false);
+  const [drawerDetalleAbierto, setDrawerDetalleAbierto] = useState(false);
   const [productoDetalle, setProductoDetalle] = useState(null);
   const [busqueda, setBusqueda] = useState("");
   const [sortField, setSortField] = useState(null);
@@ -50,6 +52,7 @@ const Inventario = () => {
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [loadingStock, setLoadingStock] = useState(false);
   const [almacenes, setAlmacenes] = useState([]);
+  const [almacenActual, setAlmacenActual] = useState(null);
   
   // Estados para formulario de productos
   const [categorias, setCategorias] = useState([]);
@@ -93,6 +96,7 @@ const Inventario = () => {
         if (almacenGuardado) {
           const almacenData = JSON.parse(almacenGuardado);
           almacenId = almacenData.id;
+          setAlmacenActual(almacenData.id);
         }
       } catch (error) {
         console.error('Error al obtener almacén del localStorage:', error);
@@ -358,8 +362,8 @@ const Inventario = () => {
         fetchProductos();
       } else {
         notifications.show({
-          title: 'Error',
-          message: result.error || 'Error al crear el producto',
+          title: result.error || 'Error',
+          message: result.message || result.details || 'Error al crear el producto',
           color: 'red'
         });
       }
@@ -386,7 +390,7 @@ const Inventario = () => {
 
   const handleVerDetalle = (producto) => {
     setProductoDetalle(producto);
-    setModalDetalleAbierto(true);
+    setDrawerDetalleAbierto(true);
   };
 
   const handleEdit = (producto) => {
@@ -585,12 +589,20 @@ const Inventario = () => {
           getNombreAlmacen={getNombreAlmacen}
         />
 
-        {/* Modal de detalle del producto */}
+        {/* Modal de detalle del producto (mantener para compatibilidad si es necesario) */}
         <ProductDetailModal
           modalDetalleAbierto={modalDetalleAbierto}
           setModalDetalleAbierto={setModalDetalleAbierto}
           productoDetalle={productoDetalle}
           getTipoControlBadge={getTipoControlBadge}
+        />
+
+        {/* Drawer de detalle del producto */}
+        <ProductDetailDrawer
+          opened={drawerDetalleAbierto}
+          onClose={() => setDrawerDetalleAbierto(false)}
+          producto={productoDetalle}
+          almacenId={almacenActual}
         />
 
         {/* Modal para agregar stock */}

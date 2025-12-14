@@ -25,11 +25,32 @@ export default async function handler(req, res) {
         } = req.body;
 
         // Validaciones básicas
-        if (!producto_id || !almacen_id || !cantidad) {
-            await connection.rollback();
-            return res.status(400).json({
-                error: 'Faltan campos requeridos: producto_id, almacen_id, cantidad'
-            });
+        if (movimientos && movimientos.length > 0) {
+            // Si se envían múltiples movimientos, validar cada uno
+            for (const movimiento of movimientos) {
+                if (!movimiento.producto_id || !movimiento.almacen_id) {
+                    await connection.rollback();
+                    return res.status(400).json({
+                        error: 'Cada movimiento debe tener: producto_id, almacen_id'
+                    });
+                }
+                // Para series, no se requiere cantidad (se asume 1)
+                // Para otros tipos, sí se requiere cantidad
+                if (!movimiento.serie && !movimiento.cantidad) {
+                    await connection.rollback();
+                    return res.status(400).json({
+                        error: 'Movimientos sin serie deben tener cantidad especificada'
+                    });
+                }
+            }
+        } else {
+            // Si es un movimiento único, validar campos raíz
+            if (!producto_id || !almacen_id || !cantidad) {
+                await connection.rollback();
+                return res.status(400).json({
+                    error: 'Faltan campos requeridos: producto_id, almacen_id, cantidad'
+                });
+            }
         }
 
         // Si es un array de movimientos (para series), procesarlos uno por uno

@@ -102,6 +102,25 @@ export default async function handler(req, res) {
     } catch (error) {
         await connection.rollback();
         console.error('Error creando producto:', error);
+        
+        // Manejar errores específicos de duplicados
+        if (error.message.includes('Duplicate entry') && error.message.includes('uk_productos_sku')) {
+            return res.status(400).json({
+                error: 'SKU Duplicado',
+                message: 'Ya existe un producto con este SKU. Por favor, use un SKU diferente.',
+                details: 'El SKU debe ser único para cada producto'
+            });
+        }
+        
+        if (error.message.includes('Duplicate entry') && error.message.includes('uk_productos_codigo_barras')) {
+            return res.status(400).json({
+                error: 'Código de Barras Duplicado',
+                message: 'Ya existe un producto con este código de barras. Por favor, use un código diferente.',
+                details: 'El código de barras debe ser único para cada producto'
+            });
+        }
+        
+        // Error genérico para otros casos
         res.status(500).json({
             error: 'Error interno del servidor',
             details: error.message

@@ -164,6 +164,62 @@ const AddStockModal = ({
     setSeriesAgregadas(seriesAgregadas.filter(s => s !== serie));
   };
 
+  // Función unificada para ejecutar un movimiento único
+  const ejecutarMovimiento = async (movimiento, mensajeExito) => {
+    const response = await fetch('/api/stock/movimientos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(movimiento)
+    });
+
+    const result = await response.json();
+    
+    if (response.ok && result.success) {
+      notifications.show({
+        title: 'Éxito',
+        message: mensajeExito,
+        color: 'green'
+      });
+      onClose();
+      onStockAdded();
+    } else {
+      notifications.show({
+        title: 'Error al Agregar Stock',
+        message: result.error || 'No se pudo agregar stock al producto. Inténtelo nuevamente.',
+        color: 'red'
+      });
+      throw new Error(result.error || 'Error en movimiento');
+    }
+  };
+
+  // Función unificada para ejecutar múltiples movimientos
+  const ejecutarMovimientos = async (movimientos, mensajeExito) => {
+    const response = await fetch('/api/stock/movimientos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ movimientos })
+    });
+
+    const result = await response.json();
+    
+    if (response.ok && result.success) {
+      notifications.show({
+        title: 'Éxito',
+        message: mensajeExito,
+        color: 'green'
+      });
+      onClose();
+      onStockAdded();
+    } else {
+      notifications.show({
+        title: 'Error en Movimientos',
+        message: result.error || 'No se pudo registrar el movimiento de stock.',
+        color: 'red'
+      });
+      throw new Error(result.error || 'Error en movimientos');
+    }
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
     
@@ -218,37 +274,16 @@ const AddStockModal = ({
       return;
     }
 
-    const response = await fetch('/api/stock/movimientos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        producto_id: producto.id,
-        almacen_id: parseInt(almacenSeleccionado),
-        cantidad: cantidad,
-        tipo_movimiento: 'INGRESO',
-        origen: 'AJUSTE_MANUAL',
-        documento_tipo: 'AJUSTE_STOCK'
-      })
-    });
+    const movimiento = {
+      producto_id: producto.id,
+      almacen_id: parseInt(almacenSeleccionado),
+      cantidad: cantidad,
+      tipo_movimiento: 'INGRESO',
+      origen: 'AJUSTE_MANUAL',
+      documento_tipo: 'AJUSTE_STOCK'
+    };
 
-    const result = await response.json();
-    
-    if (response.ok && result.success) {
-      notifications.show({
-        title: 'Éxito',
-        message: 'Stock agregado correctamente',
-        color: 'green'
-      });
-      onClose();
-      onStockAdded();
-    } else {
-      notifications.show({
-        title: 'Error al Agregar Stock',
-        message: result.error || 'No se pudo agregar stock al producto. Inténtelo nuevamente.',
-        color: 'red'
-      });
-      return;
-    }
+    await ejecutarMovimiento(movimiento, 'Stock agregado correctamente');
   };
 
   const manejarStockLote = async () => {
@@ -318,38 +353,17 @@ const AddStockModal = ({
     }
 
     // Registrar movimiento de stock
-    const response = await fetch('/api/stock/movimientos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        producto_id: producto.id,
-        almacen_id: parseInt(almacenSeleccionado),
-        cantidad: cantidad,
-        lote_id: parseInt(loteId),
-        tipo_movimiento: 'INGRESO',
-        origen: 'AJUSTE_MANUAL',
-        documento_tipo: 'AJUSTE_STOCK'
-      })
-    });
+    const movimiento = {
+      producto_id: producto.id,
+      almacen_id: parseInt(almacenSeleccionado),
+      cantidad: cantidad,
+      lote_id: parseInt(loteId),
+      tipo_movimiento: 'INGRESO',
+      origen: 'AJUSTE_MANUAL',
+      documento_tipo: 'AJUSTE_STOCK'
+    };
 
-    const result = await response.json();
-    
-    if (response.ok && result.success) {
-      notifications.show({
-        title: 'Éxito',
-        message: 'Stock con lote agregado correctamente',
-        color: 'green'
-      });
-      onClose();
-      onStockAdded();
-    } else {
-      notifications.show({
-        title: 'Error en Movimiento de Lote',
-        message: result.error || 'No se pudo registrar el movimiento de stock para el lote.',
-        color: 'red'
-      });
-      return;
-    }
+    await ejecutarMovimiento(movimiento, 'Stock con lote agregado correctamente');
   };
 
   const manejarStockSerie = async () => {
@@ -362,73 +376,20 @@ const AddStockModal = ({
       return;
     }
 
-    // Crear series en base de datos
-    const responseSeries = await fetch('/api/stock/series/crear', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        producto_id: producto.id,
-        series: seriesAgregadas
-      })
-    });
-
-    const resultSeries = await responseSeries.json();
-    
-    if (!responseSeries.ok || !resultSeries.success) {
-      // Manejar errores específicos de series duplicadas
-      if (resultSeries.details && resultSeries.details.includes('Duplicate entry') && resultSeries.details.includes('uk_series_producto_numero')) {
-        notifications.show({
-          title: 'Serie Duplicada',
-          message: 'Una o más series ya existen para este producto. Por favor, use números de serie únicos.',
-          color: 'red'
-        });
-        return;
-      }
-      
-      // Otros errores de creación de series
-      notifications.show({
-        title: 'Error al Crear Series',
-        message: resultSeries.error || 'No se pudieron crear las series. Verifique que los números de serie sean únicos.',
-        color: 'red'
-      });
-      return;
-    }
-
-    // Crear movimientos de stock (uno por serie)
-    const movimientos = resultSeries.series_creadas.map(serie => ({
+    // Crear movimientos de stock (uno por serie) con la estructura correcta
+    const movimientos = seriesAgregadas.map(numeroSerie => ({
       producto_id: producto.id,
       almacen_id: parseInt(almacenSeleccionado),
-      cantidad: 1,
-      serie_id: serie.serie_id,
       tipo_movimiento: 'INGRESO',
       origen: 'AJUSTE_MANUAL',
-      documento_tipo: 'AJUSTE_STOCK'
+      documento_tipo: 'AJUSTE_STOCK',
+      documento_id: null,
+      serie: {
+        numero_serie: numeroSerie
+      }
     }));
 
-    const responseMovimientos = await fetch('/api/stock/movimientos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ movimientos })
-    });
-
-    const resultMovimientos = await responseMovimientos.json();
-    
-    if (responseMovimientos.ok && resultMovimientos.success) {
-      notifications.show({
-        title: 'Éxito',
-        message: `Stock agregado: ${seriesAgregadas.length} series`,
-        color: 'green'
-      });
-      onClose();
-      onStockAdded();
-    } else {
-      notifications.show({
-        title: 'Error en Movimientos',
-        message: resultMovimientos.error || 'No se pudo registrar el movimiento de stock para las series.',
-        color: 'red'
-      });
-      return;
-    }
+    await ejecutarMovimientos(movimientos, `Stock agregado: ${seriesAgregadas.length} series`);
   };
 
   if (!producto) return null;
@@ -476,28 +437,6 @@ const AddStockModal = ({
         {/* TIPO LOTE */}
         {producto.tipo_control_stock === 'LOTE' && (
           <>
-            {/* Mostrar lotes existentes si los hay */}
-            {lotesExistentes.length > 0 && (
-              <Grid.Col span={12}>
-                <Card withBorder p="sm">
-                  <Text size="sm" fw={500} mb="xs" c="blue">Códigos de lote existentes:</Text>
-                  <div style={{ maxHeight: '100px', overflowY: 'auto' }}>
-                    {lotesExistentes.map((lote, index) => (
-                      <Badge 
-                        key={index} 
-                        variant="light" 
-                        color="blue" 
-                        size="sm" 
-                        style={{ marginRight: '4px', marginBottom: '4px' }}
-                      >
-                        {lote}
-                      </Badge>
-                    ))}
-                  </div>
-                </Card>
-              </Grid.Col>
-            )}
-            
             <Grid.Col span={12}>
               <Group>
                 <Button
@@ -588,28 +527,6 @@ const AddStockModal = ({
                 </Button>
               </Group>
             </Grid.Col>
-
-            {/* Mostrar series existentes si las hay */}
-            {seriesExistentes.length > 0 && (
-              <Grid.Col span={12}>
-                <Card withBorder p="sm">
-                  <Text size="sm" fw={500} mb="xs" c="blue">Series existentes:</Text>
-                  <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                    {seriesExistentes.map((serie, index) => (
-                      <Badge 
-                        key={index} 
-                        variant="light" 
-                        color="blue" 
-                        size="sm" 
-                        style={{ marginRight: '4px', marginBottom: '4px' }}
-                      >
-                        {serie}
-                      </Badge>
-                    ))}
-                  </div>
-                </Card>
-              </Grid.Col>
-            )}
 
             {seriesAgregadas.length > 0 && (
               <Grid.Col span={12}>

@@ -123,14 +123,52 @@ export async function service_RegistrarMovimientoStock(_db, movimientoData) {
     try {
         const {
             producto_id, almacen_id, tipo_movimiento, origen,
-            documento_tipo, documento_id, cantidad, lote_id, serie_id
+            documento_tipo, documento_id, cantidad, lote_id, serie_id, serie
         } = movimientoData;
+        
+        let finalSerieId = serie_id || null;
+        let finalCantidad = cantidad || null;
+        
+        // Si se proporciona un objeto serie, crear/obtener el serie_id
+        if (serie && serie.numero_serie) {
+            // Primero intentar encontrar la serie existente
+            const [existingSeries] = await _db.execute(
+                'SELECT id FROM series WHERE producto_id = ? AND numero_serie = ?',
+                [producto_id, serie.numero_serie]
+            );
+            
+            if (existingSeries.length > 0) {
+                finalSerieId = existingSeries[0].id;
+            } else {
+                // Crear nueva serie
+                const [result] = await _db.execute(
+                    'INSERT INTO series (producto_id, numero_serie) VALUES (?, ?)',
+                    [producto_id, serie.numero_serie]
+                );
+                finalSerieId = result.insertId;
+            }
+            
+            // Para series, la cantidad siempre es 1
+            finalCantidad = 1;
+        }
+        
+        // Asegurar que los parámetros undefined se conviertan en null
+        const params = [
+            producto_id || null,
+            almacen_id || null, 
+            tipo_movimiento || 'INGRESO',
+            origen || 'AJUSTE_MANUAL',
+            documento_tipo || 'AJUSTE_STOCK',
+            documento_id || null,
+            finalCantidad,
+            lote_id || null,
+            finalSerieId
+        ];
         
         // Ejecutar el procedimiento almacenado para registrar movimiento de stock
         await _db.execute(
             'CALL sp_registrar_movimiento_stock(?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [producto_id, almacen_id, tipo_movimiento, origen, documento_tipo, 
-             documento_id, cantidad, lote_id, serie_id]
+            params
         );
         
         return true;
@@ -185,5 +223,16 @@ export async function service_CrearSerie(_db, serieData) {
     } catch (err) {
         console.error('Error en service_CrearSerie:', err);
         throw new Error('Error creando serie: ' + err.message);
+    }
+}
+
+export async function service_ObtenerStockProductoAlmacen(_db, productoId, almacenId) {
+    try {
+        // Llamar al procedimiento almacenado para obtener stock de producto en almacén específico
+        const [rows] = await _db.execute('CALL sp_get_stock_producto_almacen(?, ?)', [productoId, almacenId]);
+        return rows;
+    } catch (err) {
+        console.error('Error en service_ObtenerStockProductoAlmacen:', err);
+        throw new Error('Error obteniendo stock del producto en almacén: ' + err.message);
     }
 }
