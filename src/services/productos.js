@@ -260,3 +260,114 @@ export async function service_BorrarProductoLogico(_db, productoId) {
         throw new Error('Error borrando producto: ' + err.message);
     }
 }
+
+export async function service_UpsertSerieAtributo(_db, serieId, clave, valor) {
+    try {
+        // Validaciones básicas en el cliente
+        if (!serieId) {
+            throw new Error('ID de serie es requerido');
+        }
+        
+        if (!clave || !clave.trim()) {
+            throw new Error('La clave del atributo es requerida');
+        }
+        
+        if (valor === null || valor === undefined || !valor.toString().trim()) {
+            throw new Error('El valor del atributo es requerido');
+        }
+        
+        // Llamar al procedimiento almacenado para hacer upsert del atributo de serie
+        const [result] = await _db.execute(
+            'CALL sp_upsert_serie_atributo(?, ?, ?)', 
+            [serieId, clave.trim(), valor.toString().trim()]
+        );
+        
+        return {
+            success: true,
+            message: 'Atributo de serie guardado exitosamente',
+            data: {
+                serie_id: serieId,
+                clave: clave.trim(),
+                valor: valor.toString().trim()
+            }
+        };
+        
+    } catch (err) {
+        console.error('Error en service_UpsertSerieAtributo:', err);
+        
+        // Verificar si es un error específico del procedimiento almacenado
+        if (err.sqlState === '45000') {
+            // Errores controlados del procedimiento (validaciones del negocio)
+            throw new Error(err.sqlMessage);
+        }
+        
+        // Error genérico
+        throw new Error('Error guardando atributo de serie: ' + err.message);
+    }
+}
+
+export async function service_ListarAtributosSerie(_db, serieId) {
+    try {
+        // Validación básica en el cliente
+        if (!serieId) {
+            throw new Error('ID de serie es requerido');
+        }
+
+        // Llamar al procedimiento almacenado para listar atributos de la serie
+        const [rows] = await _db.execute('CALL sp_listar_atributos_serie(?)', [serieId]);
+        
+        return rows[0] || [];
+        
+    } catch (err) {
+        console.error('Error en service_ListarAtributosSerie:', err);
+        
+        // Verificar si es un error específico del procedimiento almacenado
+        if (err.sqlState === '45000') {
+            // Error controlado del procedimiento
+            throw new Error(err.sqlMessage);
+        }
+        
+        // Error genérico
+        throw new Error('Error obteniendo atributos de serie: ' + err.message);
+    }
+}
+
+export async function service_BorrarSerieAtributo(_db, serieId, clave) {
+    try {
+        // Validaciones básicas en el cliente
+        if (!serieId) {
+            throw new Error('ID de serie es requerido');
+        }
+        
+        if (!clave || !clave.trim()) {
+            throw new Error('La clave del atributo es requerida');
+        }
+
+        // Llamar al procedimiento almacenado para borrar el atributo de la serie
+        const [result] = await _db.execute(
+            'CALL sp_borrar_serie_atributo(?, ?)', 
+            [serieId, clave.trim()]
+        );
+        
+        return {
+            success: true,
+            message: 'Atributo de serie borrado exitosamente',
+            data: {
+                serie_id: serieId,
+                clave: clave.trim()
+            }
+        };
+        
+    } catch (err) {
+        console.error('Error en service_BorrarSerieAtributo:', err);
+        
+        // Verificar si es un error específico del procedimiento almacenado
+        if (err.sqlState === '45000') {
+            // Error controlado del procedimiento
+            throw new Error(err.sqlMessage);
+        }
+        
+        // Error genérico
+        throw new Error('Error borrando atributo de serie: ' + err.message);
+    }
+}
