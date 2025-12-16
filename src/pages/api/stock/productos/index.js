@@ -49,13 +49,7 @@ export default async function handler(req, res) {
 
         // Procesar según el tipo de control de stock
         if (tipo_control_stock === 'LOTE') {
-            if (!lotes || lotes.length === 0) {
-                await connection.rollback();
-                return res.status(400).json({
-                    error: 'Para productos tipo LOTE se requieren datos de lotes'
-                });
-            }
-
+          
             if (!almacen_id) {
                 await connection.rollback();
                 return res.status(400).json({

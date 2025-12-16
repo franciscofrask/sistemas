@@ -18,11 +18,15 @@ import {
   Group,
   Paper,
   ActionIcon,
+  Modal,
+  Stack,
+  Loader,
+  Center,
 } from "@mantine/core";
 
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
-import { IconSearch, IconFilter, IconFilterOff } from "@tabler/icons-react";
+import { IconSearch, IconFilter, IconFilterOff, IconAlertTriangle } from "@tabler/icons-react";
 
 const rowsPerPage = 5;
 
@@ -65,6 +69,11 @@ const Inventario = () => {
   // Estados para modal de agregar stock
   const [modalAgregarStock, setModalAgregarStock] = useState(false);
   const [productoParaStock, setProductoParaStock] = useState(null);
+
+  // Estados para modal de confirmación de borrado
+  const [modalBorrarAbierto, setModalBorrarAbierto] = useState(false);
+  const [productoParaBorrar, setProductoParaBorrar] = useState(null);
+  const [loadingBorrar, setLoadingBorrar] = useState(false);
 
   const form = useForm({
     initialValues: {
@@ -318,14 +327,7 @@ const Inventario = () => {
 
       if (tipoControl === 'LOTE') {
         const lotesValidos = lotes.filter(l => l.codigo && l.cantidad > 0);
-        if (lotesValidos.length === 0) {
-          notifications.show({
-            title: 'Error',
-            message: 'Debe agregar al menos un lote válido',
-            color: 'red'
-          });
-          return;
-        }
+       
         datosProducto.lotes = lotesValidos.map(l => ({
           codigo_lote: l.codigo,
           fecha_venc: l.fechaVencimiento || null,
@@ -398,7 +400,94 @@ const Inventario = () => {
   };
 
   const handleDelete = (productoId) => {
-    console.log('Eliminar producto:', productoId);
+    // Buscar el producto en la lista para obtener sus datos
+    const producto = productos.find(p => p.id === productoId);
+    if (!producto) {
+      notifications.show({
+        title: 'Error',
+        message: 'Producto no encontrado',
+        color: 'red'
+      });
+      return;
+    }
+    
+    // Verificar si el producto tiene stock
+    if (producto.stock_total > 0) {
+      notifications.show({
+        title: 'No se puede borrar',
+        message: `El producto "${producto.nombre}" tiene stock (${parseInt(producto.stock_total)} unidades). No se puede borrar un producto con stock.`,
+        color: 'orange'
+      });
+      return;
+    }
+    
+    // Si no tiene stock, mostrar modal de confirmación
+    setProductoParaBorrar(producto);
+    setModalBorrarAbierto(true);
+  };
+
+  const confirmarBorrado = async () => {
+    if (!productoParaBorrar) return;
+    
+    setLoadingBorrar(true);
+    
+    try {
+      const response = await fetch(`/api/stock/productos/borrar?id=${productoParaBorrar.id}`, {
+        method: 'DELETE'
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        notifications.show({
+          title: 'Éxito',
+          message: `Producto "${productoParaBorrar.nombre}" borrado exitosamente`,
+          color: 'green'
+        });
+        
+        // Recargar la lista de productos
+        await cargarProductos();
+        
+        // Cerrar modal
+        setModalBorrarAbierto(false);
+        setProductoParaBorrar(null);
+        
+      } else if (response.status === 409) {
+        // Error de regla de negocio (producto tiene stock, no existe, etc.)
+        notifications.show({
+          title: 'No se puede borrar',
+          message: data.message || 'No se puede borrar el producto',
+          color: 'orange'
+        });
+        
+        // Cerrar modal ya que es un error de validación
+        setModalBorrarAbierto(false);
+        setProductoParaBorrar(null);
+        
+      } else {
+        // Otros errores del servidor
+        notifications.show({
+          title: 'Error del servidor',
+          message: data.message || `Error del servidor (${response.status})`,
+          color: 'red'
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error de red borrando producto:', error);
+      notifications.show({
+        title: 'Error de conexión',
+        message: 'No se pudo conectar al servidor. Verifique su conexión.',
+        color: 'red'
+      });
+    } finally {
+      setLoadingBorrar(false);
+    }
+  };
+
+  const cancelarBorrado = () => {
+    setModalBorrarAbierto(false);
+    setProductoParaBorrar(null);
   };
 
   const handleAgregarStock = (producto) => {
@@ -613,6 +702,62 @@ const Inventario = () => {
           almacenes={almacenes}
           onStockAdded={onStockAdded}
         />
+
+        {/* Modal de confirmación de borrado */}
+        <Modal
+          opened={modalBorrarAbierto}
+          onClose={cancelarBorrado}
+          title="Confirmar eliminación"
+          centered
+          closeOnClickOutside={false}
+          closeOnEscape={false}
+        >
+          <Stack gap="md">
+            <Group>
+              <IconAlertTriangle size={24} color="orange" />
+              <Text size="lg" fw={600}>
+                ¿Está seguro que desea eliminar este producto?
+              </Text>
+            </Group>
+            
+            {productoParaBorrar && (
+              <>
+                <Text size="sm" c="dimmed">
+                  Producto: <Text component="span" fw={500}>{productoParaBorrar.nombre}</Text>
+                </Text>
+                <Text size="sm" c="dimmed">
+                  SKU: <Text component="span" fw={500}>{productoParaBorrar.sku || 'N/A'}</Text>
+                </Text>
+                <Text size="sm" c="dimmed">
+                  Stock actual: <Text component="span" fw={500}>{parseInt(productoParaBorrar.stock_total_global || 0)} unidades</Text>
+                </Text>
+              </>
+            )}
+            
+            <Text size="sm" c="red" style={{ backgroundColor: '#ffebee', padding: '8px', borderRadius: '4px' }}>
+              <Text fw={500} component="span">⚠️ Advertencia:</Text> Esta acción eliminará permanentemente el producto
+              y todos sus datos asociados (lotes, series, etc.). Esta acción no se puede deshacer.
+            </Text>
+            
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="outline"
+                onClick={cancelarBorrado}
+                disabled={loadingBorrar}
+              >
+                Cancelar
+              </Button>
+              <Button
+                color="red"
+                onClick={confirmarBorrado}
+                loading={loadingBorrar}
+                leftSection={loadingBorrar ? <Loader size="xs" /> : undefined}
+              >
+                {loadingBorrar ? 'Eliminando...' : 'Eliminar producto'}
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
       </Container>
     </ProtectedLayout>
   );

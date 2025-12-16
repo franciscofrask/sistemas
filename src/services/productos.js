@@ -236,3 +236,27 @@ export async function service_ObtenerStockProductoAlmacen(_db, productoId, almac
         throw new Error('Error obteniendo stock del producto en almacén: ' + err.message);
     }
 }
+
+export async function service_BorrarProductoLogico(_db, productoId) {
+    try {
+        // Llamar al procedimiento almacenado para borrar lógicamente un producto
+        // El procedimiento valida que no tenga stock y hace el borrado lógico del producto y sus hijos
+        const [result] = await _db.execute('CALL sp_borrar_producto_logico(?)', [productoId]);
+        
+        return {
+            success: true,
+            message: 'Producto borrado lógicamente exitosamente'
+        };
+    } catch (err) {
+        console.error('Error en service_BorrarProductoLogico:', err);
+        
+        // Verificar si es un error específico del procedimiento almacenado
+        if (err.sqlState === '45000') {
+            // Error controlado del procedimiento (producto no existe, ya borrado, o tiene stock)
+            throw new Error(err.sqlMessage);
+        }
+        
+        // Error genérico
+        throw new Error('Error borrando producto: ' + err.message);
+    }
+}
