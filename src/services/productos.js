@@ -371,3 +371,65 @@ export async function service_BorrarSerieAtributo(_db, serieId, clave) {
         throw new Error('Error borrando atributo de serie: ' + err.message);
     }
 }
+
+export async function service_EditarProducto(_db, productoId, datosProducto) {
+    try {
+        // Validaciones básicas en el cliente
+        if (!productoId) {
+            throw new Error('ID de producto es requerido');
+        }
+
+        const {
+            nombre, sku, codigo_barras, categoria_id, unidad_medida_id,
+            tipo_control_stock, es_servicio, precio_lista, activo
+        } = datosProducto;
+
+        // Validación de campos requeridos
+        if (!nombre || !nombre.trim()) {
+            throw new Error('El nombre del producto es requerido');
+        }
+
+        if (!unidad_medida_id) {
+            throw new Error('La unidad de medida es requerida');
+        }
+
+        // Llamar al procedimiento almacenado para editar el producto
+        const [result] = await _db.execute(
+            'CALL sp_editar_producto(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                productoId,
+                nombre.trim(),
+                sku || null,
+                codigo_barras || null,
+                categoria_id || null,
+                unidad_medida_id,
+                tipo_control_stock || null,
+                es_servicio || 0,
+                precio_lista || 0,
+                activo !== undefined ? activo : 1
+            ]
+        );
+        
+        return {
+            success: true,
+            message: 'Producto editado exitosamente',
+            data: {
+                producto_id: productoId,
+                nombre: nombre.trim(),
+                actualizado_en: new Date().toISOString()
+            }
+        };
+        
+    } catch (err) {
+        console.error('Error en service_EditarProducto:', err);
+        
+        // Verificar si es un error específico del procedimiento almacenado
+        if (err.sqlState === '45000') {
+            // Errores controlados del procedimiento (validaciones del negocio)
+            throw new Error(err.sqlMessage);
+        }
+        
+        // Error genérico
+        throw new Error('Error editando producto: ' + err.message);
+    }
+}

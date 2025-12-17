@@ -22,11 +22,13 @@ import {
   Stack,
   Loader,
   Center,
+  Switch,
+  NumberInput
 } from "@mantine/core";
 
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
-import { IconSearch, IconFilter, IconFilterOff, IconAlertTriangle } from "@tabler/icons-react";
+import { IconSearch, IconFilter, IconFilterOff, IconAlertTriangle, IconEdit, IconCheck } from "@tabler/icons-react";
 
 const rowsPerPage = 5;
 
@@ -74,6 +76,22 @@ const Inventario = () => {
   const [modalBorrarAbierto, setModalBorrarAbierto] = useState(false);
   const [productoParaBorrar, setProductoParaBorrar] = useState(null);
   const [loadingBorrar, setLoadingBorrar] = useState(false);
+
+  // Estados para modal de edición
+  const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
+  const [productoParaEditar, setProductoParaEditar] = useState(null);
+  const [loadingEditar, setLoadingEditar] = useState(false);
+  const [formEditar, setFormEditar] = useState({
+    nombre: '',
+    sku: '',
+    codigo_barras: '',
+    categoria_id: '',
+    unidad_medida_id: '',
+    tipo_control_stock: 'UNIDAD',
+    es_servicio: false,
+    precio_lista: 0,
+    activo: true
+  });
 
   const form = useForm({
     initialValues: {
@@ -396,7 +414,117 @@ const Inventario = () => {
   };
 
   const handleEdit = (producto) => {
-    console.log('Editar producto:', producto.id);
+    setProductoParaEditar(producto);
+    
+    // Precargar datos en el formulario
+    setFormEditar({
+      nombre: producto.nombre || '',
+      sku: producto.sku || '',
+      codigo_barras: producto.codigo_barras || '',
+      categoria_id: producto.categoria_id || '',
+      unidad_medida_id: producto.unidad_medida_id || '',
+      tipo_control_stock: producto.tipo_control_stock || 'UNIDAD',
+      es_servicio: producto.es_servicio || false,
+      precio_lista: producto.precio_lista || 0,
+      activo: producto.activo !== undefined ? producto.activo : true
+    });
+    
+    setModalEditarAbierto(true);
+  };
+
+  const cerrarModalEditar = () => {
+    setModalEditarAbierto(false);
+    setProductoParaEditar(null);
+    setFormEditar({
+      nombre: '',
+      sku: '',
+      codigo_barras: '',
+      categoria_id: '',
+      unidad_medida_id: '',
+      tipo_control_stock: 'UNIDAD',
+      es_servicio: false,
+      precio_lista: 0,
+      activo: true
+    });
+  };
+
+  const manejarCambioFormEditar = (campo, valor) => {
+    setFormEditar(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+  };
+
+  const guardarEdicionProducto = async () => {
+    if (!productoParaEditar) return;
+    
+    // Validaciones básicas
+    if (!formEditar.nombre.trim()) {
+      notifications.show({
+        title: 'Error de validación',
+        message: 'El nombre del producto es requerido',
+        color: 'red'
+      });
+      return;
+    }
+
+    if (!formEditar.unidad_medida_id) {
+      notifications.show({
+        title: 'Error de validación',
+        message: 'La unidad de medida es requerida',
+        color: 'red'
+      });
+      return;
+    }
+
+    setLoadingEditar(true);
+
+    try {
+      const response = await fetch(`/api/stock/productos/editar?id=${productoParaEditar.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formEditar)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        notifications.show({
+          title: 'Éxito',
+          message: `Producto "${formEditar.nombre}" editado exitosamente`,
+          color: 'green'
+        });
+        
+        // Recargar la lista de productos
+        await fetchProductos();
+        
+        // Cerrar modal
+        cerrarModalEditar();
+        
+      } else if (response.status === 409) {
+        // Error de regla de negocio (cambio de tipo de control con historial)
+        notifications.show({
+          title: 'No se puede editar',
+          message: data.message || 'No se puede cambiar el tipo de control de stock',
+          color: 'orange'
+        });
+        
+      } else {
+        throw new Error(data.message || 'Error al editar el producto');
+      }
+
+    } catch (error) {
+      console.error('Error editando producto:', error);
+      notifications.show({
+        title: 'Error',
+        message: error.message || 'No se pudo editar el producto',
+        color: 'red'
+      });
+    } finally {
+      setLoadingEditar(false);
+    }
   };
 
   const handleDelete = (productoId) => {
@@ -754,6 +882,140 @@ const Inventario = () => {
                 leftSection={loadingBorrar ? <Loader size="xs" /> : undefined}
               >
                 {loadingBorrar ? 'Eliminando...' : 'Eliminar producto'}
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
+        {/* Modal de edición de producto */}
+        <Modal
+          opened={modalEditarAbierto}
+          onClose={cerrarModalEditar}
+          title={`Editar producto: ${productoParaEditar?.nombre}`}
+          centered
+          size="lg"
+          closeOnClickOutside={false}
+          closeOnEscape={false}
+        >
+          <Stack gap="md">
+            <Grid>
+              <Grid.Col span={12}>
+                <TextInput
+                  label="Nombre del producto"
+                  placeholder="Ingrese el nombre"
+                  value={formEditar.nombre}
+                  onChange={(e) => manejarCambioFormEditar('nombre', e.target.value)}
+                  required
+                  withAsterisk
+                />
+              </Grid.Col>
+              
+              <Grid.Col span={6}>
+                <TextInput
+                  label="SKU"
+                  placeholder="Código SKU"
+                  value={formEditar.sku}
+                  onChange={(e) => manejarCambioFormEditar('sku', e.target.value)}
+                />
+              </Grid.Col>
+              
+              <Grid.Col span={6}>
+                <TextInput
+                  label="Código de barras"
+                  placeholder="Código de barras"
+                  value={formEditar.codigo_barras}
+                  onChange={(e) => manejarCambioFormEditar('codigo_barras', e.target.value)}
+                />
+              </Grid.Col>
+              
+              <Grid.Col span={6}>
+                <Select
+                  label="Categoría"
+                  placeholder="Seleccione categoría"
+                  data={categorias.map(cat => ({
+                    value: cat.id.toString(),
+                    label: cat.nombre
+                  }))}
+                  value={formEditar.categoria_id.toString()}
+                  onChange={(value) => manejarCambioFormEditar('categoria_id', value)}
+                />
+              </Grid.Col>
+              
+              <Grid.Col span={6}>
+                <Select
+                  label="Unidad de medida"
+                  placeholder="Seleccione unidad"
+                  data={unidades.map(unidad => ({
+                    value: unidad.id.toString(),
+                    label: unidad.nombre
+                  }))}
+                  value={formEditar.unidad_medida_id.toString()}
+                  onChange={(value) => manejarCambioFormEditar('unidad_medida_id', value)}
+                  required
+                  withAsterisk
+                />
+              </Grid.Col>
+              
+              <Grid.Col span={6}>
+                <Select
+                  label="Tipo de control de stock"
+                  data={[
+                    { value: 'UNIDAD', label: 'Por unidad' },
+                    { value: 'LOTE', label: 'Por lote' },
+                    { value: 'SERIE', label: 'Por serie' }
+                  ]}
+                  value={formEditar.tipo_control_stock}
+                  onChange={(value) => manejarCambioFormEditar('tipo_control_stock', value)}
+                  disabled={true}
+                  description="No se puede cambiar el tipo de control una vez creado el producto"
+                />
+              </Grid.Col>
+              
+              <Grid.Col span={6}>
+                <NumberInput
+                  label="Precio de lista"
+                  placeholder="0.00"
+                  value={formEditar.precio_lista}
+                  onChange={(value) => manejarCambioFormEditar('precio_lista', value || 0)}
+                  decimalScale={2}
+                  fixedDecimalScale
+                  min={0}
+                />
+              </Grid.Col>
+              
+              <Grid.Col span={6}>
+                <Switch
+                  label="Es servicio"
+                  description="Marque si es un servicio en lugar de un producto físico"
+                  checked={formEditar.es_servicio}
+                  onChange={(e) => manejarCambioFormEditar('es_servicio', e.currentTarget.checked)}
+                />
+              </Grid.Col>
+              
+              <Grid.Col span={6}>
+                <Switch
+                  label="Activo"
+                  description="Marque para mantener el producto activo"
+                  checked={formEditar.activo}
+                  onChange={(e) => manejarCambioFormEditar('activo', e.currentTarget.checked)}
+                />
+              </Grid.Col>
+            </Grid>
+            
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="outline"
+                onClick={cerrarModalEditar}
+                disabled={loadingEditar}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={guardarEdicionProducto}
+                loading={loadingEditar}
+                leftSection={loadingEditar ? undefined : <IconCheck size={16} />}
+              >
+                {loadingEditar ? 'Guardando...' : 'Guardar cambios'}
               </Button>
             </Group>
           </Stack>
