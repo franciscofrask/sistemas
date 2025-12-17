@@ -574,7 +574,7 @@ const Inventario = () => {
         });
         
         // Recargar la lista de productos
-        await cargarProductos();
+        await fetchProductos();
         
         // Cerrar modal
         setModalBorrarAbierto(false);

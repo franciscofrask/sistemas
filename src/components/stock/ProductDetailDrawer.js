@@ -80,6 +80,23 @@ const ProductDetailDrawer = ({
   const [modalBorradoMasivo, setModalBorradoMasivo] = useState(false);
   const [cargandoBorradoMasivo, setCargandoBorradoMasivo] = useState(false);
 
+  // Estados para modal de edición de lotes
+  const [modalEditarLoteAbierto, setModalEditarLoteAbierto] = useState(false);
+  const [loteParaEditar, setLoteParaEditar] = useState(null);
+  const [cargandoEdicionLote, setCargandoEdicionLote] = useState(false);
+  const [formLote, setFormLote] = useState({
+    codigoLote: '',
+    fechaVenc: ''
+  });
+
+  // Estados para modal de edición de series
+  const [modalEditarSerieAbierto, setModalEditarSerieAbierto] = useState(false);
+  const [serieParaEditar, setSerieParaEditar] = useState(null);
+  const [cargandoEdicionSerie, setCargandoEdicionSerie] = useState(false);
+  const [formSerie, setFormSerie] = useState({
+    numeroSerie: ''
+  });
+
   // Cargar datos del producto cuando se abre el drawer
   useEffect(() => {
     if (opened && producto && almacenId) {
@@ -553,6 +570,180 @@ const ProductDetailDrawer = ({
     setSerieSeleccionada(null);
   };
 
+  // Funciones para manejar edición de lotes
+  const abrirModalEditarLote = (lote) => {
+    setLoteParaEditar(lote);
+    setFormLote({
+      codigoLote: lote.lote_codigo,
+      fechaVenc: lote.fecha_vencimiento.split('T')[0] // Convertir fecha a formato YYYY-MM-DD
+    });
+    setModalEditarLoteAbierto(true);
+  };
+
+  const cerrarModalEditarLote = () => {
+    setModalEditarLoteAbierto(false);
+    setLoteParaEditar(null);
+    setFormLote({
+      codigoLote: '',
+      fechaVenc: ''
+    });
+  };
+
+  const manejarCambioFormLote = (campo, valor) => {
+    setFormLote(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+  };
+
+  const guardarEdicionLote = async () => {
+    if (!loteParaEditar) return;
+
+    // Validaciones
+    if (!formLote.codigoLote.trim()) {
+      notifications.show({
+        title: 'Error de validación',
+        message: 'El código del lote es requerido',
+        color: 'red'
+      });
+      return;
+    }
+
+    if (!formLote.fechaVenc) {
+      notifications.show({
+        title: 'Error de validación',
+        message: 'La fecha de vencimiento es requerida',
+        color: 'red'
+      });
+      return;
+    }
+
+    setCargandoEdicionLote(true);
+
+    try {
+      const response = await fetch('/api/stock/lotes/editar', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          loteId: loteParaEditar.lote_id,
+          codigoLote: formLote.codigoLote.trim(),
+          fechaVenc: formLote.fechaVenc
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        notifications.show({
+          title: 'Éxito',
+          message: `Lote editado exitosamente`,
+          color: 'green'
+        });
+        
+        cerrarModalEditarLote();
+        
+        // Recargar datos del producto para mostrar los cambios
+        await cargarDetalleProducto();
+        
+      } else {
+        throw new Error(data.message || 'Error al editar el lote');
+      }
+
+    } catch (error) {
+      console.error('Error editando lote:', error);
+      notifications.show({
+        title: 'Error',
+        message: error.message || 'No se pudo editar el lote',
+        color: 'red'
+      });
+    } finally {
+      setCargandoEdicionLote(false);
+    }
+  };
+
+  // Funciones para manejar edición de series
+  const abrirModalEditarSerie = (serie) => {
+    setSerieParaEditar(serie);
+    setFormSerie({
+      numeroSerie: serie.serie_numero
+    });
+    setModalEditarSerieAbierto(true);
+  };
+
+  const cerrarModalEditarSerie = () => {
+    setModalEditarSerieAbierto(false);
+    setSerieParaEditar(null);
+    setFormSerie({
+      numeroSerie: ''
+    });
+  };
+
+  const manejarCambioFormSerie = (campo, valor) => {
+    setFormSerie(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+  };
+
+  const guardarEdicionSerie = async () => {
+    if (!serieParaEditar) return;
+
+    // Validaciones
+    if (!formSerie.numeroSerie.trim()) {
+      notifications.show({
+        title: 'Error de validación',
+        message: 'El número de serie es requerido',
+        color: 'red'
+      });
+      return;
+    }
+
+    setCargandoEdicionSerie(true);
+
+    try {
+      const response = await fetch('/api/stock/series/editar', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          serieId: serieParaEditar.serie_id,
+          numeroSerie: formSerie.numeroSerie.trim()
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        notifications.show({
+          title: 'Éxito',
+          message: `Serie editada exitosamente`,
+          color: 'green'
+        });
+        
+        cerrarModalEditarSerie();
+        
+        // Recargar datos del producto para mostrar los cambios
+        await cargarDetalleProducto();
+        
+      } else {
+        throw new Error(data.message || 'Error al editar la serie');
+      }
+
+    } catch (error) {
+      console.error('Error editando serie:', error);
+      notifications.show({
+        title: 'Error',
+        message: error.message || 'No se pudo editar la serie',
+        color: 'red'
+      });
+    } finally {
+      setCargandoEdicionSerie(false);
+    }
+  };
+
   const datos = procesarDatos();
 
   if (!producto) return null;
@@ -657,6 +848,7 @@ const ProductDetailDrawer = ({
                       <Table.Th>Fecha Vencimiento</Table.Th>
                       <Table.Th>Stock</Table.Th>
                       <Table.Th>Estado</Table.Th>
+                      <Table.Th width={120}>Acciones</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -680,6 +872,20 @@ const ProductDetailDrawer = ({
                             {getColorFechaVencimiento(lote.fecha_vencimiento) === 'red' ? 'Vencido' :
                              getColorFechaVencimiento(lote.fecha_vencimiento) === 'orange' ? 'Por vencer' : 'Vigente'}
                           </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Group gap="xs">
+                            <Tooltip label="Editar lote">
+                              <ActionIcon
+                                variant="light"
+                                color="blue"
+                                size="sm"
+                                onClick={() => abrirModalEditarLote(lote)}
+                              >
+                                <IconEdit size={14} />
+                              </ActionIcon>
+                            </Tooltip>
+                          </Group>
                         </Table.Td>
                       </Table.Tr>
                     ))}
@@ -777,6 +983,14 @@ const ProductDetailDrawer = ({
                               </Menu.Target>
                               
                               <Menu.Dropdown>
+                                <Menu.Label>Gestión de series</Menu.Label>
+                                <Menu.Item
+                                  leftSection={<IconEdit size={14} />}
+                                  onClick={() => abrirModalEditarSerie(serie)}
+                                >
+                                  Editar número de serie
+                                </Menu.Item>
+                                <Menu.Divider />
                                 <Menu.Label>Gestión de atributos</Menu.Label>
                                 <Menu.Item
                                   leftSection={<IconPlus size={14} />}
@@ -1013,6 +1227,92 @@ const ProductDetailDrawer = ({
               leftSection={cargandoBorradoMasivo ? undefined : <IconTrash size={16} />}
             >
               {cargandoBorradoMasivo ? 'Eliminando...' : 'Eliminar todos'}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Modal de edición de lotes */}
+      <Modal
+        opened={modalEditarLoteAbierto}
+        onClose={cerrarModalEditarLote}
+        title={`Editar lote: ${loteParaEditar?.lote_codigo || ''}`}
+        centered
+        closeOnClickOutside={false}
+        closeOnEscape={false}
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Código del lote"
+            placeholder="Ingrese el código del lote"
+            value={formLote.codigoLote}
+            onChange={(e) => manejarCambioFormLote('codigoLote', e.target.value)}
+            required
+            withAsterisk
+          />
+
+          <TextInput
+            label="Fecha de vencimiento"
+            placeholder="YYYY-MM-DD"
+            type="date"
+            value={formLote.fechaVenc}
+            onChange={(e) => manejarCambioFormLote('fechaVenc', e.target.value)}
+            required
+            withAsterisk
+          />
+          
+          <Group justify="flex-end" mt="md">
+            <Button
+              variant="outline"
+              onClick={cerrarModalEditarLote}
+              disabled={cargandoEdicionLote}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={guardarEdicionLote}
+              loading={cargandoEdicionLote}
+              leftSection={cargandoEdicionLote ? undefined : <IconEdit size={16} />}
+            >
+              {cargandoEdicionLote ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Modal de edición de series */}
+      <Modal
+        opened={modalEditarSerieAbierto}
+        onClose={cerrarModalEditarSerie}
+        title={`Editar serie: ${serieParaEditar?.serie_numero || ''}`}
+        centered
+        closeOnClickOutside={false}
+        closeOnEscape={false}
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Número de serie"
+            placeholder="Ingrese el número de serie"
+            value={formSerie.numeroSerie}
+            onChange={(e) => manejarCambioFormSerie('numeroSerie', e.target.value)}
+            required
+            withAsterisk
+          />
+          
+          <Group justify="flex-end" mt="md">
+            <Button
+              variant="outline"
+              onClick={cerrarModalEditarSerie}
+              disabled={cargandoEdicionSerie}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={guardarEdicionSerie}
+              loading={cargandoEdicionSerie}
+              leftSection={cargandoEdicionSerie ? undefined : <IconEdit size={16} />}
+            >
+              {cargandoEdicionSerie ? 'Guardando...' : 'Guardar cambios'}
             </Button>
           </Group>
         </Stack>

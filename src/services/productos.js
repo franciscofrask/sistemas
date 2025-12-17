@@ -433,3 +433,111 @@ export async function service_EditarProducto(_db, productoId, datosProducto) {
         throw new Error('Error editando producto: ' + err.message);
     }
 }
+
+// Función para editar un lote
+export async function service_EditarLote(_db, loteId, codigoLote, fechaVenc) {
+    console.log('Editando lote:', { loteId, codigoLote, fechaVenc });
+    
+    try {
+        // Validaciones básicas
+        if (!loteId || loteId <= 0) {
+            throw new Error('El ID del lote es requerido');
+        }
+        
+        if (!codigoLote || codigoLote.trim() === '') {
+            throw new Error('El código del lote es requerido');
+        }
+
+        if (!fechaVenc) {
+            throw new Error('La fecha de vencimiento es requerida');
+        }
+
+        // Llamar al procedimiento almacenado
+        const [result] = await _db.execute(
+            'CALL sp_editar_lote(?, ?, ?)',
+            [loteId, codigoLote.trim(), fechaVenc]
+        );
+
+        console.log('Resultado del SP:', result);
+        
+        return {
+            success: true,
+            message: 'Lote editado exitosamente'
+        };
+
+    } catch (err) {
+        console.error('Error en service_EditarLote:', err);
+        
+        // Manejar errores específicos del negocio
+        if (err.message.includes('LOTE_NO_EXISTE')) {
+            throw new Error('El lote especificado no existe');
+        }
+        
+        if (err.message.includes('CODIGO_DUPLICADO')) {
+            throw new Error('Ya existe un lote con ese código para este producto');
+        }
+        
+        if (err.message.includes('LOTE_ID_REQUERIDO')) {
+            throw new Error('El ID del lote es requerido');
+        }
+        
+        if (err.message.includes('CODIGO_REQUERIDO')) {
+            throw new Error('El código del lote es requerido');
+        }
+        
+        // Error genérico
+        throw new Error('Error editando lote: ' + err.message);
+    }
+}
+
+// Función para editar una serie
+export async function service_EditarSerie(_db, serieId, numeroSerie) {
+    console.log('Editando serie:', { serieId, numeroSerie });
+    
+    try {
+        // Validaciones básicas
+        if (!serieId || serieId <= 0) {
+            throw new Error('El ID de la serie es requerido');
+        }
+        
+        if (!numeroSerie || numeroSerie.trim() === '') {
+            throw new Error('El número de serie es requerido');
+        }
+
+        // Llamar al procedimiento almacenado
+        const [result] = await _db.execute(
+            'CALL sp_editar_numero_serie(?, ?)',
+            [serieId, numeroSerie.trim()]
+        );
+
+        console.log('Resultado del SP:', result);
+        
+        return {
+            success: true,
+            message: 'Serie editada exitosamente'
+        };
+
+    } catch (err) {
+        console.error('Error en service_EditarSerie:', err);
+        
+        // Manejar errores específicos del negocio
+        if (err.message.includes('serie_id es requerido')) {
+            throw new Error('El ID de la serie es requerido');
+        }
+        
+        if (err.message.includes('numero_serie no puede estar vacío')) {
+            throw new Error('El número de serie no puede estar vacío');
+        }
+        
+        if (err.message.includes('La serie no existe o está borrada')) {
+            throw new Error('La serie especificada no existe o fue eliminada');
+        }
+        
+        if (err.message.includes('Ya existe una serie con ese número')) {
+            throw new Error('Ya existe una serie con ese número para este producto');
+        }
+        
+        // Error genérico
+        throw new Error('Error editando serie: ' + err.message);
+    }
+}
