@@ -24,13 +24,11 @@ import {
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useFuncionalidades } from "@/hooks/useFuncionalidades";
 
 const Sidebar = () => {
   const pathname = usePathname();
-  const { data: session } = useSession();
-  const { funcionalidades, loading, mapearAMenuItems } = useFuncionalidades();
+  const { loading, mapearAMenuItems } = useFuncionalidades();
 
   // Mapeo de iconos por nombre
   const iconMap = {

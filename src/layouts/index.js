@@ -6,7 +6,7 @@ import {
   Group,
   UnstyledButton,
   Image,
-  Flex,
+ 
   Box,
   Breadcrumbs,
   Anchor,
@@ -15,7 +15,7 @@ import {
   Center,
   Menu,
   Avatar,
-  Divider,
+
   Select,
 } from "@mantine/core";
 import {
@@ -25,8 +25,7 @@ import {
   IconLogout,
   IconSettings,
   IconChevronDown,
-  IconBuildingWarehouse,
-  IconCheck,
+
 } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
 import { usePathname, useRouter } from "next/navigation";
@@ -81,40 +80,47 @@ export function LayoutBase({ children }) {
 
   // Cargar almacenes disponibles (solo activos para el menú)
   const cargarAlmacenes = async () => {
-    if (!session?.user?.token) return;
-    
+    console.log('Cargando almacenes...');
     setLoadingAlmacenes(true);
+    
     try {
       const response = await fetch('/api/stock/almacenes?solo_activos=1', {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.user.token}`
+          'Content-Type': 'application/json'
         }
       });
       
       const result = await response.json();
+      console.log('Respuesta de API almacenes:', result);
+      
       if (response.ok && result.success) {
         setAlmacenes(result.data || []);
+        console.log('Almacenes cargados:', result.data);
         
         // Verificar si hay un almacén guardado en localStorage
         const almacenGuardado = localStorage.getItem('almacen_seleccionado');
+        console.log('Almacén guardado en localStorage:', almacenGuardado);
+        
         if (almacenGuardado) {
           try {
             const almacen = JSON.parse(almacenGuardado);
             // Verificar que el almacén aún existe en la lista
             const almacenExiste = result.data.find(a => a.id === almacen.id);
             if (almacenExiste) {
+              console.log('Restaurando almacén:', almacen);
               setAlmacenSeleccionado(almacen);
             } else {
-              // Si no existe, limpiar localStorage
+              console.log('El almacén guardado ya no existe, limpiando localStorage');
               localStorage.removeItem('almacen_seleccionado');
             }
           } catch (error) {
-            // Si hay error parseando, limpiar localStorage
+            console.error('Error parseando almacén guardado:', error);
             localStorage.removeItem('almacen_seleccionado');
           }
         }
+      } else {
+        console.error('Error en respuesta de API:', result);
       }
     } catch (error) {
       console.error('Error al cargar almacenes:', error);
@@ -124,26 +130,35 @@ export function LayoutBase({ children }) {
 
   // Función para seleccionar almacén
   const seleccionarAlmacen = (almacenId) => {
+    console.log('Seleccionando almacén:', almacenId);
+    console.log('Almacenes disponibles:', almacenes);
+    
     if (!almacenId) {
       // Deseleccionar almacén
+      console.log('Deseleccionando almacén');
       setAlmacenSeleccionado(null);
       localStorage.removeItem('almacen_seleccionado');
     } else {
       // Buscar el almacén en la lista
       const almacen = almacenes.find(a => a.id.toString() === almacenId.toString());
+      console.log('Almacén encontrado:', almacen);
+      
       if (almacen) {
         setAlmacenSeleccionado(almacen);
         localStorage.setItem('almacen_seleccionado', JSON.stringify(almacen));
+        console.log('Almacén guardado en localStorage:', almacen);
+      } else {
+        console.warn('No se encontró el almacén con ID:', almacenId);
       }
     }
   };
 
-  // Cargar almacenes cuando la sesión esté lista
+  // Cargar almacenes cuando el componente se monte
   useEffect(() => {
-    if (session?.user?.token) {
+    if (status === "authenticated") {
       cargarAlmacenes();
     }
-  }, [session]);
+  }, [status]);
 
   // Mostrar loader mientras verifica la sesión
   if (status === "loading") {

@@ -116,7 +116,7 @@ const RouteGuard = ({ children }) => {
         };
 
         authCheck();
-    }, [router.asPath, session, status]);
+    }, [router.asPath, router, session, status]);
 
     // Mostrar loading mientras verifica
     if (loading) {

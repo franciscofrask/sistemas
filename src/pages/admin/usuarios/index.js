@@ -16,7 +16,6 @@ import {
     Select,
     LoadingOverlay,
     Avatar,
-    Tooltip,
     Stack,
     Card,
     Grid,
@@ -27,19 +26,17 @@ import {
 import {
     IconUserPlus,
     IconEdit,
-    IconTrash,
+   
     IconEye,
     IconUser,
     IconMail,
-    IconCalendar,
-    IconShield,
+
     IconDots,
-    IconUserCheck,
+
     IconUserX,
     IconRefresh,
     IconSettings,
-    IconCheck,
-    IconX,
+ 
 } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useSession } from 'next-auth/react';

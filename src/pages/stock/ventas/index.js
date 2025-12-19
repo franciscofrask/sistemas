@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import ProtectedLayout from "@/components/Layout/ProtectedLayout";
+import CrearVentaModal from "@/components/stock/CrearVentaModal";
 import {
   Button,
   Card,
@@ -29,6 +30,10 @@ export default function PresupuestosPage() {
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  
+  // Estado para el modal de crear venta
+  const [modalCrearVentaAbierto, setModalCrearVentaAbierto] = useState(false);
+  
   const router = useRouter();
 
   const fetchPresupuestos = async () => {
@@ -41,6 +46,12 @@ export default function PresupuestosPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Función que se ejecuta cuando se crea una venta exitosamente
+  const handleVentaCreada = () => {
+    fetchPresupuestos(); // Recargar la lista de ventas
+    setModalCrearVentaAbierto(false); // Cerrar el modal
   };
 
   useEffect(() => {
@@ -106,7 +117,8 @@ export default function PresupuestosPage() {
             <Button
               variant="outline"
               color="#EE0E0F"
-              onClick={() => router.push('/stock/ventas/crearventa')}
+              leftSection={<IconPlus size={16} />}
+              onClick={() => setModalCrearVentaAbierto(true)}
             >
               Crear Venta
             </Button>
@@ -160,6 +172,13 @@ export default function PresupuestosPage() {
           </Group>
         </Grid>
       </Container>
+      
+      {/* Modal para crear venta */}
+      <CrearVentaModal
+        opened={modalCrearVentaAbierto}
+        onClose={() => setModalCrearVentaAbierto(false)}
+        onVentaCreada={handleVentaCreada}
+      />
     </ProtectedLayout>
   );
 }

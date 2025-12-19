@@ -13,12 +13,33 @@ import {
   TextInput,
   Title,
   Pagination,
+  Loader,
+  Table,
+  Badge,
+  Menu,
+  ActionIcon,
+  Card,
+  Select,
+  NumberInput,
+  Modal,
+  Stack,
+  Checkbox,
 } from "@mantine/core";
 
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import {
+  IconBarcode,
+  IconChevronDown,
+  IconChevronUp,
+  IconEye,
+  IconPackages,
+  IconPencil,
+  IconPlus,
   IconSearch,
+  IconSelector,
+  IconSettings,
+  IconTrash,
 } from "@tabler/icons-react";
 
 const rowsPerPage = 5;
