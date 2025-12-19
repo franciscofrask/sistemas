@@ -1,5 +1,4 @@
-// src/pages/api/stock/almacenes/index.js
-import { service_ListarAlmacenes, service_CrearAlmacen } from '../../../../services/almacenes';
+import { service_ListarProveedores, service_CrearProveedor, service_EditarProveedor, service_BorrarProveedor, service_ObtenerProveedor } from '../../../../services/proveedores';
 import { getConnection } from '../../../../lib/db';
 
 export default async function handler(req, res) {
@@ -7,42 +6,43 @@ export default async function handler(req, res) {
 
     try {
         if (req.method === 'GET') {
-            // Listar almacenes
-            const { solo_activos } = req.query;
+            // Listar proveedores
+            const { incluir_inactivos } = req.query;
             
-            console.log('API listar almacenes - parámetros:', { solo_activos });
+            console.log('API listar proveedores - parámetros:', { incluir_inactivos });
 
-            const almacenes = await service_ListarAlmacenes(
+            const proveedores = await service_ListarProveedores(
                 connection, 
-                solo_activos === '0' ? 0 : 1
+                incluir_inactivos === '1' || incluir_inactivos === 'true'
             );
 
             return res.status(200).json({
                 success: true,
-                data: almacenes,
-                message: 'Almacenes obtenidos correctamente'
+                data: proveedores,
+                message: 'Proveedores obtenidos correctamente'
             });
 
         } else if (req.method === 'POST') {
-            // Crear almacén
-            const { nombre, codigo, direccion, descripcion } = req.body;
+            // Crear proveedor
+            const { razon_social, cuit, email, telefono, direccion } = req.body;
 
-            console.log('API crear almacén - datos recibidos:', req.body);
+            console.log('API crear proveedor - datos recibidos:', req.body);
 
             // Validaciones
-            if (!nombre || nombre.trim() === '') {
+            if (!razon_social || razon_social.trim() === '') {
                 return res.status(400).json({
-                    error: 'Nombre requerido',
-                    message: 'El nombre del almacén es obligatorio'
+                    error: 'Razón social requerida',
+                    message: 'La razón social del proveedor es obligatoria'
                 });
             }
 
             // Llamar al servicio
-            const resultado = await service_CrearAlmacen(connection, {
-                nombre,
-                codigo,
-                direccion,
-                descripcion
+            const resultado = await service_CrearProveedor(connection, {
+                razon_social,
+                cuit,
+                email,
+                telefono,
+                direccion
             });
 
             return res.status(201).json({
@@ -59,17 +59,17 @@ export default async function handler(req, res) {
         }
 
     } catch (error) {
-        console.error('Error en API almacenes:', error);
+        console.error('Error en API proveedores:', error);
         
         // Manejar errores de negocio
-        if (error.message.includes('Ya existe un almacén con ese nombre')) {
+        if (error.message.includes('Ya existe un proveedor con ese CUIT')) {
             return res.status(409).json({
-                error: 'Nombre duplicado',
+                error: 'CUIT duplicado',
                 message: error.message
             });
         }
 
-        if (error.message.includes('requerido')) {
+        if (error.message.includes('requerida')) {
             return res.status(400).json({
                 error: 'Datos requeridos',
                 message: error.message

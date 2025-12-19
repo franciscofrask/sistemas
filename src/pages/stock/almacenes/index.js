@@ -17,6 +17,8 @@ import {
   ActionIcon,
   Pagination,
   Loader,
+  Badge,
+  Switch,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { IconPencil, IconPlus, IconTrash, IconSearch } from "@tabler/icons-react";
@@ -37,22 +39,33 @@ export default function AlmacenesPage() {
   const form = useForm({
     initialValues: {
       nombre: "",
-      ubicacion: "",
-      descripcion: "",
-    },
+      codigo: "",
+      direccion: "",
+      descripcion: "",      activo: true,    },
     validate: {
       nombre: value => (value.length < 2 ? "El nombre es obligatorio" : null),
-      ubicacion: value => (value.length < 2 ? "La ubicación es obligatoria" : null),
     },
   });
 
   const fetchAlmacenes = async () => {
     try {
+      setLoading(true);
       const res = await fetch("/api/stock/almacenes");
       const data = await res.json();
-      setAlmacenes(Array.isArray(data)? data: []);
+      
+      if (res.ok && data.success) {
+        setAlmacenes(data.data || []);
+      } else {
+        throw new Error(data.message || 'Error cargando almacenes');
+      }
     } catch (error) {
-      notifications.show({ title: "Error", message: error.message, color: "red" });
+      console.error('Error cargando almacenes:', error);
+      notifications.show({ 
+        title: "Error", 
+        message: "Error de conexión al cargar almacenes", 
+        color: "red" 
+      });
+      setAlmacenes([]);
     } finally {
       setLoading(false);
     }
@@ -74,22 +87,40 @@ export default function AlmacenesPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'Error en la operación');
+      }
 
       notifications.show({
         title: modoEdicion ? "Almacén actualizado" : "Almacén creado",
-        message: data.message,
+        message: data.message || 'Operación completada exitosamente',
         color: "green",
       });
 
+      handleCloseModal();
       fetchAlmacenes();
-      form.reset();
-      setModoEdicion(false);
-      setAlmacenEditando(null);
-      setOpened(false);
-    } catch (error) {
-      notifications.show({ title: "Error", message: error.message, color: "red" });
+    } catch (err) {
+      notifications.show({ 
+        title: "Error", 
+        message: err.message, 
+        color: "red" 
+      });
     }
+  };
+
+  const handleCloseModal = () => {
+    form.reset();
+    setModoEdicion(false);
+    setAlmacenEditando(null);
+    setOpened(false);
+  };
+
+  const handleCreate = () => {
+    form.reset();
+    setModoEdicion(false);
+    setAlmacenEditando(null);
+    setOpened(true);
   };
 
   const handleDelete = async id => {
@@ -97,25 +128,54 @@ export default function AlmacenesPage() {
     try {
       const res = await fetch(`/api/stock/almacenes/${id}`, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      
+      if (!res.ok) {
+        // Manejar diferentes tipos de errores
+        if (res.status === 409) {
+          // Error de integridad referencial
+          throw new Error(data.message || 'No se puede borrar el almacén debido a registros relacionados');
+        } else if (res.status === 404) {
+          // Almacén no encontrado
+          throw new Error(data.message || 'El almacén no existe');
+        } else {
+          // Otros errores
+          throw new Error(data.message || 'Error eliminando almacén');
+        }
+      }
 
-      notifications.show({ title: "Almacén eliminado", message: data.message, color: "green" });
+      notifications.show({ 
+        title: "Almacén eliminado", 
+        message: data.message || 'Almacén eliminado exitosamente', 
+        color: "green" 
+      });
       fetchAlmacenes();
     } catch (error) {
-      notifications.show({ title: "Error", message: error.message, color: "red" });
+      notifications.show({ 
+        title: "Error", 
+        message: error.message, 
+        color: "red",
+        autoClose: 8000 // Más tiempo para leer mensajes de error largos
+      });
     }
   };
 
   const handleEdit = almacen => {
-    form.setValues(almacen);
+    form.setValues({
+      nombre: almacen.nombre,
+      codigo: almacen.codigo || '',
+      direccion: almacen.direccion || '',
+      descripcion: almacen.descripcion || '',
+      activo: almacen.activo === 1 || almacen.activo === true
+    });
     setModoEdicion(true);
-    setAlmacenEditando(almacen.id_almacen);
+    setAlmacenEditando(almacen.id);
     setOpened(true);
   };
 
   const almacenesFiltrados = almacenes.filter(a =>
     a.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    a.ubicacion.toLowerCase().includes(busqueda.toLowerCase()) ||
+    (a.codigo || "").toLowerCase().includes(busqueda.toLowerCase()) ||
+    (a.direccion || "").toLowerCase().includes(busqueda.toLowerCase()) ||
     (a.descripcion || "").toLowerCase().includes(busqueda.toLowerCase())
   );
 
@@ -126,14 +186,20 @@ export default function AlmacenesPage() {
   const rows = pageRows.map((a, index) => (
     <tr justify={"flex-start"} align={"flex-start"} key={index}>
       <td>{a.nombre}</td>
-      <td>{a.ubicacion}</td>
+      <td>{a.codigo || "-"}</td>
+      <td>{a.direccion || "-"}</td>
       <td>{a.descripcion || "-"}</td>
+      <td>
+        <Badge color={a.activo ? "green" : "red"}>
+          {a.activo ? 'Activo' : 'Inactivo'}
+        </Badge>
+      </td>
       <td>
         <Group gap="xs">
           <ActionIcon color="blue" variant="subtle" onClick={() => handleEdit(a)}>
             <IconPencil size={16} />
           </ActionIcon>
-          <ActionIcon color="red" variant="subtle" onClick={() => handleDelete(a.id_almacen)}>
+          <ActionIcon color="red" variant="subtle" onClick={() => handleDelete(a.id)}>
             <IconTrash size={16} />
           </ActionIcon>
         </Group>
@@ -153,7 +219,7 @@ export default function AlmacenesPage() {
           </Grid.Col>
 
           <Grid.Col span={12}>
-            <Button variant="outline" color="#EE0E0F" onClick={() => setOpened(true)} >
+            <Button variant="outline" color="#EE0E0F" onClick={handleCreate} >
               Crear Almacén
             </Button>
           </Grid.Col>
@@ -181,8 +247,10 @@ export default function AlmacenesPage() {
                   <thead>
                     <tr>
                       <th align="start">Nombre</th>
-                      <th align="start">Ubicación</th>
+                      <th align="start">Código</th>
+                      <th align="start">Dirección</th>
                       <th align="start">Descripción</th>
+                      <th align="start">Estado</th>
                       <th align="start">Acciones</th>
                     </tr>
                   </thead>
@@ -206,24 +274,55 @@ export default function AlmacenesPage() {
 
         <Modal
           opened={opened}
-          onClose={() => {
-            setOpened(false);
-            form.reset();
-            setModoEdicion(false);
-            setAlmacenEditando(null);
-          }}
+          onClose={handleCloseModal}
           title={modoEdicion ? "Editar Almacén" : "Crear Almacén"}
-          size="sm"
+          size="lg"
         >
           <form onSubmit={form.onSubmit(handleSubmit)}>
-            <Stack>
-              <TextInput label="Nombre" {...form.getInputProps("nombre")} required />
-              <TextInput label="Ubicación" {...form.getInputProps("ubicacion")} required />
-              <TextInput label="Descripción" {...form.getInputProps("descripcion")} />
-              <Button type="submit" fullWidth variant="outline" color="#EE0E0F">
-                {modoEdicion ? "Guardar cambios" : "Crear Almacén"}
-              </Button>
-            </Stack>
+            <Grid>
+              <Grid.Col span={12}>
+                <TextInput 
+                  label="Nombre" 
+                  placeholder="Nombre del almacén"
+                  required
+                  {...form.getInputProps("nombre")} 
+                />
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <TextInput 
+                  label="Código" 
+                  placeholder="Código del almacén"
+                  {...form.getInputProps("codigo")} 
+                />
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <TextInput 
+                  label="Dirección" 
+                  placeholder="Dirección del almacén"
+                  {...form.getInputProps("direccion")} 
+                />
+              </Grid.Col>
+              <Grid.Col span={12}>
+                <TextInput 
+                  label="Descripción" 
+                  placeholder="Descripción del almacén"
+                  {...form.getInputProps("descripcion")} 
+                />
+              </Grid.Col>
+              {modoEdicion && (
+                <Grid.Col span={12}>
+                  <Switch
+                    label="Almacén activo"
+                    {...form.getInputProps("activo", { type: "checkbox" })}
+                  />
+                </Grid.Col>
+              )}
+              <Grid.Col span={12}>
+                <Button type="submit" fullWidth variant="outline" color="#EE0E0F">
+                  {modoEdicion ? "Guardar cambios" : "Crear Almacén"}
+                </Button>
+              </Grid.Col>
+            </Grid>
           </form>
         </Modal>
       </Container>

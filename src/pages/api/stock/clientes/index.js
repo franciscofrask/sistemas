@@ -1,5 +1,4 @@
-// src/pages/api/stock/almacenes/index.js
-import { service_ListarAlmacenes, service_CrearAlmacen } from '../../../../services/almacenes';
+import { service_ListarClientes, service_CrearCliente, service_EditarCliente, service_BorrarCliente, service_ObtenerCliente } from '../../../../services/clientes';
 import { getConnection } from '../../../../lib/db';
 
 export default async function handler(req, res) {
@@ -7,42 +6,43 @@ export default async function handler(req, res) {
 
     try {
         if (req.method === 'GET') {
-            // Listar almacenes
-            const { solo_activos } = req.query;
+            // Listar clientes
+            const { incluir_inactivos } = req.query;
             
-            console.log('API listar almacenes - parámetros:', { solo_activos });
+            console.log('API listar clientes - parámetros:', { incluir_inactivos });
 
-            const almacenes = await service_ListarAlmacenes(
+            const clientes = await service_ListarClientes(
                 connection, 
-                solo_activos === '0' ? 0 : 1
+                incluir_inactivos === '1' || incluir_inactivos === 'true'
             );
 
             return res.status(200).json({
                 success: true,
-                data: almacenes,
-                message: 'Almacenes obtenidos correctamente'
+                data: clientes,
+                message: 'Clientes obtenidos correctamente'
             });
 
         } else if (req.method === 'POST') {
-            // Crear almacén
-            const { nombre, codigo, direccion, descripcion } = req.body;
+            // Crear cliente
+            const { nombre, cuit, email, telefono, direccion } = req.body;
 
-            console.log('API crear almacén - datos recibidos:', req.body);
+            console.log('API crear cliente - datos recibidos:', req.body);
 
             // Validaciones
             if (!nombre || nombre.trim() === '') {
                 return res.status(400).json({
                     error: 'Nombre requerido',
-                    message: 'El nombre del almacén es obligatorio'
+                    message: 'El nombre del cliente es obligatorio'
                 });
             }
 
             // Llamar al servicio
-            const resultado = await service_CrearAlmacen(connection, {
+            const resultado = await service_CrearCliente(connection, {
                 nombre,
-                codigo,
-                direccion,
-                descripcion
+                cuit,
+                email,
+                telefono,
+                direccion
             });
 
             return res.status(201).json({
@@ -59,12 +59,12 @@ export default async function handler(req, res) {
         }
 
     } catch (error) {
-        console.error('Error en API almacenes:', error);
+        console.error('Error en API clientes:', error);
         
         // Manejar errores de negocio
-        if (error.message.includes('Ya existe un almacén con ese nombre')) {
+        if (error.message.includes('Ya existe un cliente con ese CUIT')) {
             return res.status(409).json({
-                error: 'Nombre duplicado',
+                error: 'CUIT duplicado',
                 message: error.message
             });
         }
