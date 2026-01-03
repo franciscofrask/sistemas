@@ -21,6 +21,10 @@ import {
   IconBuildingWarehouse,
   IconSettings,
   IconShield,
+  IconShoppingBag,
+  IconReceipt,
+  IconPackage,
+  IconCash,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -30,22 +34,57 @@ const Sidebar = () => {
   const pathname = usePathname();
   const { loading, mapearAMenuItems } = useFuncionalidades();
 
-  // Mapeo de iconos por nombre
-  const iconMap = {
-    IconLayoutDashboard,
-    IconUsers,
-    IconTruck,
-    IconFileText,
-    IconShoppingCart,
-    IconStack,
-    IconBuildingWarehouse,
-    IconShield,
+  // Función para obtener icono dinámicamente
+  const getIcon = (iconName) => {
+    const iconMap = {
+      IconLayoutDashboard,
+      IconUsers,
+      IconTruck,
+      IconFileText,
+      IconShoppingCart,
+      IconStack,
+      IconBuildingWarehouse,
+      IconShield,
+      IconShoppingBag,
+      IconReceipt,
+      IconPackage,
+      IconCash,
+    };
+
+    // Si el icono existe en el mapeo, lo retornamos
+    if (iconMap[iconName]) {
+      return iconMap[iconName];
+    }
+
+    // Mapeo adicional por nombre común (para mayor flexibilidad)
+    const nameMapping = {
+      'compras': IconShoppingBag,
+      'ventas': IconShoppingCart,
+      'productos': IconPackage,
+      'almacenes': IconBuildingWarehouse,
+      'usuarios': IconUsers,
+      'dashboard': IconLayoutDashboard,
+      'presupuesto': IconReceipt,
+      'presupuestos': IconReceipt,
+      'comercio': IconShoppingCart,
+      'administracion': IconShield,
+      'stock': IconStack,
+    };
+
+    // Buscar por nombre común (sin importar mayúsculas)
+    const normalizedName = iconName?.toString().toLowerCase();
+    if (nameMapping[normalizedName]) {
+      return nameMapping[normalizedName];
+    }
+
+    // Icono por defecto
+    return IconSettings;
   };
 
   // Convertir funcionalidades a elementos de menú (ya incluye Dashboard si tiene permisos)
   const allMenuItems = mapearAMenuItems().map(item => ({
     ...item,
-    icon: iconMap[item.icon] || IconSettings
+    icon: getIcon(item.icon)
   }));
 
   const isActive = (path) => pathname === path;

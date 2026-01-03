@@ -76,10 +76,11 @@ export function useFuncionalidades() {
                     { label: 'Listado de presupuestos', path: '/stock/presupuestos' },
                     { label: 'Crear Presupuesto', path: '/stock/presupuestos/crearpresupuesto' }
                 ];
-            } else if (nombre === 'comercio') {
+            } else if (nombre === 'comercio' || nombre === 'ventas') {
                 menuItem.children = [
                     { label: 'Ventas', path: '/stock/ventas' },
-                    { label: 'Crear Venta', path: '/stock/ventas/crearventa' }
+                    { label: 'Crear Venta', path: '/stock/ventas/crearventa' },
+                    { label: 'Compras', path: '/stock/compras' }
                 ];
             } else if (nombre === 'administracion') {
                 menuItem.children = [
