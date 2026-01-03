@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import ProtectedLayout from "@/components/Layout/ProtectedLayout";
-import CrearVentaModal from "@/components/stock/CrearVentaModal";
 import {
   Button,
   Card,
@@ -18,86 +17,123 @@ import {
   ActionIcon,
   Pagination,
   Loader,
+  Menu,
 } from "@mantine/core";
-import { IconPencil, IconPlus, IconTrash, IconSearch } from "@tabler/icons-react";
+import { IconPlus, IconSearch, IconPencil, IconX, IconEye } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { useRouter } from 'next/router';
 
-const rowsPerPage = 5;
+const rowsPerPage = 10;
 
-export default function PresupuestosPage() {
-  const [presupuestos, setPresupuestos] = useState([]);
+export default function VentasPage() {
+  const [ventas, setVentas] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  
-  // Estado para el modal de crear venta
-  const [modalCrearVentaAbierto, setModalCrearVentaAbierto] = useState(false);
+  const [total, setTotal] = useState(0);
   
   const router = useRouter();
 
-  const fetchPresupuestos = async () => {
+  const fetchVentas = async (opts = {}) => {
     try {
-      const res = await fetch("/api/stock/presupuestos/detallado");
-      const data = await res.json();
-      setPresupuestos(Array.isArray(data) ? data : []);
+      setLoading(true);
+      const params = new URLSearchParams();
+      const limit = rowsPerPage;
+      const offset = (page - 1) * rowsPerPage;
+      params.set('limit', String(limit));
+      params.set('offset', String(offset));
+      if (busqueda && busqueda.trim()) params.set('q', busqueda.trim());
+      const res = await fetch(`/api/stock/ventas?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json?.message || 'No se pudo listar ventas');
+      const items = json.data?.items || [];
+      setVentas(items);
+      setTotal(Number(json.data?.total || items.length));
     } catch (error) {
       notifications.show({ title: "Error", message: error.message, color: "red" });
+      setVentas([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
   };
 
-  // Función que se ejecuta cuando se crea una venta exitosamente
-  const handleVentaCreada = () => {
-    fetchPresupuestos(); // Recargar la lista de ventas
-    setModalCrearVentaAbierto(false); // Cerrar el modal
-  };
-
-  useEffect(() => {
-    fetchPresupuestos();
-  }, []);
-
-  const handleDelete = async (id) => {
+  const handleAnular = async (ventaId) => {
     try {
-      const res = await fetch(`/api/stock/presupuestos/${id}`, {
-        method: 'DELETE'
+      if (!ventaId) return;
+      if (!confirm('¿Confirmar anulación de la venta?')) return;
+      const resp = await fetch('/api/stock/ventas/anular', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ venta_id: parseInt(ventaId) }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      notifications.show({ title: "Presupuesto eliminado", message: data.mensaje, color: "green" });
-      fetchPresupuestos();
+      const data = await resp.json();
+      if (!resp.ok || !data.success) throw new Error(data?.message || 'No se pudo anular la venta');
+      notifications.show({ title: 'Venta anulada', message: data.message || 'Se anuló la venta correctamente', color: 'green' });
+      fetchVentas();
     } catch (error) {
-      notifications.show({ title: "Error", message: error.message, color: "red" });
+      notifications.show({ title: 'Error', message: error.message, color: 'red' });
     }
   };
 
-  const presupuestosFiltrados = presupuestos.filter(p =>
-    p.numero_presupuesto.toLowerCase().includes(busqueda.toLowerCase()) ||
-    p.cliente.toLowerCase().includes(busqueda.toLowerCase()) ||
-    (p.observaciones || "").toLowerCase().includes(busqueda.toLowerCase())
-  );
+  const handleCancelarBorrador = async (ventaId) => {
+    try {
+      if (!ventaId) return;
+      if (!confirm('¿Cancelar esta venta en borrador?')) return;
+      const resp = await fetch('/api/stock/ventas/cancelar-borrador', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ venta_id: parseInt(ventaId) }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.success) throw new Error(data?.message || 'No se pudo cancelar la venta');
+      notifications.show({ title: 'Venta cancelada', message: data.message || 'Se canceló la venta correctamente', color: 'green' });
+      fetchVentas();
+    } catch (error) {
+      notifications.show({ title: 'Error', message: error.message, color: 'red' });
+    }
+  };
 
-  const start = (page - 1) * rowsPerPage;
-  const end = start + rowsPerPage;
-  const pageRows = presupuestosFiltrados.slice(start, end);
+  useEffect(() => {
+    fetchVentas();
+  }, [page, busqueda]);
 
-  const rows = pageRows.map((p, index) => (
-    <tr key={index}>
-      <td>{p.numero_presupuesto}</td>
-      <td>{p.fecha}</td>
-      <td>{p.cliente}</td>
-     <td>{p.moneda} ${Number(p.total).toFixed(2)}</td>
-      <td>{p.estado}</td>
+  // Acciones futuras: ver/editar ventas
+
+  const rows = ventas.map((v) => (
+    <tr key={v.id}>
+      <td>{v.nro_comprobante || '-'}</td>
+      <td>{new Date(v.fecha).toLocaleString()}</td>
+      <td>{v.cliente_nombre}</td>
+      <td>${Number(v.total || 0).toFixed(2)}</td>
+      <td>{v.estado}</td>
       <td>
         <Group gap="xs">
-          <ActionIcon color="blue" variant="subtle" onClick={() => router.push(`/stock/presupuestos/crearpresupuesto?id=${p.id_presupuesto}`)}>
-            <IconPencil size={16} />
-          </ActionIcon>
-          <ActionIcon color="red" variant="subtle" onClick={() => handleDelete(p.id_presupuesto)}>
-            <IconTrash size={16} />
-          </ActionIcon>
+          <Menu position="bottom-start" withinPortal>
+            <Menu.Target>
+              <Button size="xs" variant="light" color="gray">Acciones</Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconEye size={14} />} onClick={() => router.push(`/stock/ventas/detalle/${v.id}`)}>
+                Ver detalle
+              </Menu.Item>
+              {v.estado === 'BORRADOR' && (
+                <>
+                  <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => router.push(`/stock/ventas/crearventa?id=${v.id}`)}>
+                    Editar
+                  </Menu.Item>
+                  <Menu.Item color="red" leftSection={<IconX size={14} />} onClick={() => handleCancelarBorrador(v.id)}>
+                    Cancelar borrador
+                  </Menu.Item>
+                </>
+              )}
+              {v.estado === 'CONFIRMADA' && (
+                <Menu.Item color="red" leftSection={<IconX size={14} />} onClick={() => handleAnular(v.id)}>
+                  Anular venta
+                </Menu.Item>
+              )}
+            </Menu.Dropdown>
+          </Menu>
         </Group>
       </td>
     </tr>
@@ -118,7 +154,7 @@ export default function PresupuestosPage() {
               variant="outline"
               color="#EE0E0F"
               leftSection={<IconPlus size={16} />}
-              onClick={() => setModalCrearVentaAbierto(true)}
+              onClick={() => router.push('/stock/ventas/crearventa')}
             >
               Crear Venta
             </Button>
@@ -146,15 +182,54 @@ export default function PresupuestosPage() {
                 <Table striped highlightOnHover withRowBorders withColumnBorders>
                   <thead>
                     <tr>
-                      <th>Número</th>
-                      <th>Fecha</th>
-                      <th>Cliente</th>
-                      <th>Total</th>
-                      <th>Estado</th>
-                      <th>Acciones</th>
+                      <th style={{ textAlign: 'center' }}>Número</th>
+                      <th style={{ textAlign: 'center' }}>Fecha</th>
+                      <th style={{ textAlign: 'center' }}>Cliente</th>
+                      <th style={{ textAlign: 'center' }}>Total</th>
+                      <th style={{ textAlign: 'center' }}>Estado</th>
+                      <th style={{ textAlign: 'center' }}>Acciones</th>
                     </tr>
                   </thead>
-                  <tbody>{rows}</tbody>
+                  <tbody>
+                    {ventas.map((v) => (
+                      <tr key={v.id}>
+                        <td style={{ textAlign: 'center' }}>{v.nro_comprobante || '-'}</td>
+                        <td style={{ textAlign: 'center' }}>{new Date(v.fecha).toLocaleString()}</td>
+                        <td style={{ textAlign: 'center' }}>{v.cliente_nombre}</td>
+                        <td style={{ textAlign: 'center' }}>${Number(v.total || 0).toFixed(2)}</td>
+                        <td style={{ textAlign: 'center' }}>{v.estado}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <Group gap="xs" justify="center">
+                            <Menu position="bottom-start" withinPortal>
+                              <Menu.Target>
+                                <Button size="xs" variant="light" color="gray">Acciones</Button>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<IconEye size={14} />} onClick={() => router.push(`/stock/ventas/detalle/${v.id}`)}>
+                                  Ver detalle
+                                </Menu.Item>
+                                {v.estado === 'BORRADOR' && (
+                                  <>
+                                    <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => router.push(`/stock/ventas/crearventa?id=${v.id}`)}>
+                                      Editar
+                                    </Menu.Item>
+                                    <Menu.Item color="red" leftSection={<IconX size={14} />} onClick={() => handleCancelarBorrador(v.id)}>
+                                      Cancelar borrador
+                                    </Menu.Item>
+                                  </>
+                                )}
+                                {v.estado === 'CONFIRMADA' && (
+                                  <Menu.Item color="red" leftSection={<IconX size={14} />} onClick={() => handleAnular(v.id)}>
+                                    Anular venta
+                                  </Menu.Item>
+                                )}
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Group>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </Table>
               </>
             )}
@@ -162,7 +237,7 @@ export default function PresupuestosPage() {
 
           <Group justify="center" mt="md">
             <Pagination
-              total={Math.ceil(presupuestosFiltrados.length / rowsPerPage)}
+              total={Math.ceil((total || 0) / rowsPerPage) || 1}
               value={page}
               onChange={setPage}
               color="#ee0e0f"
@@ -172,13 +247,6 @@ export default function PresupuestosPage() {
           </Group>
         </Grid>
       </Container>
-      
-      {/* Modal para crear venta */}
-      <CrearVentaModal
-        opened={modalCrearVentaAbierto}
-        onClose={() => setModalCrearVentaAbierto(false)}
-        onVentaCreada={handleVentaCreada}
-      />
     </ProtectedLayout>
   );
 }

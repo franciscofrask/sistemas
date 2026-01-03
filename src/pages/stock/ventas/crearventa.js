@@ -1,12 +1,15 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
+import ProtectedLayout from "@/components/Layout/ProtectedLayout";
 import {
   ActionIcon,
   Badge,
   Box,
   Button,
   Card,
+  Container,
   Divider,
   Flex,
+  Grid,
   Group,
   Modal,
   NumberInput,
@@ -17,9 +20,13 @@ import {
   TextInput,
   Title,
   Tooltip,
+  Loader,
+  Autocomplete,
 } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
-import { IconPlus, IconTrash, IconCheck, IconX, IconEdit } from "@tabler/icons-react";
+import { useDisclosure, useDebouncedValue } from "@mantine/hooks";
+import { IconPlus, IconTrash, IconCheck, IconX, IconEdit, IconArrowLeft, IconSearch } from "@tabler/icons-react";
+import { useRouter } from "next/router";
+import { useStableSession } from "@/hooks/useStableSession";
 
 /**
  * Vista: Venta en BORRADOR (UI mock)
@@ -27,44 +34,7 @@ import { IconPlus, IconTrash, IconCheck, IconX, IconEdit } from "@tabler/icons-r
  * - Reemplazá los "mocks" por tus llamadas a SP vía API.
  */
 
-// Mock: clientes
-const CLIENTES = [
-  { value: "1", label: "Consumidor final" },
-  { value: "2", label: "Empresa X SRL" },
-  { value: "3", label: "Juan Pérez" },
-];
 
-// Mock: almacenes
-const ALMACENES = [
-  { value: "2", label: "Sucursal Centro (id 2)" },
-  { value: "1", label: "Casa Central (id 1)" },
-];
-
-// Mock: productos y su tipo de control
-// tipo_control_stock: "UNIDAD" | "LOTE" | "SERIE"
-const PRODUCTOS = [
-  { value: "10", label: "Yerba 1kg (UNIDAD)", tipo: "UNIDAD", precioSugerido: 1800 },
-  { value: "34", label: "Leche (LOTE)", tipo: "LOTE", precioSugerido: 1200 },
-  { value: "33", label: "Notebook (SERIE)", tipo: "SERIE", precioSugerido: 850000 },
-];
-
-// Mock: lotes disponibles por producto+almacén
-const LOTES_DISPONIBLES = {
-  "34|2": [
-    { value: "7", label: "Lote 0000000007 (stock 10)" },
-    { value: "8", label: "Lote 0000000008 (stock 5)" },
-  ],
-  "34|1": [{ value: "9", label: "Lote 0000000009 (stock 3)" }],
-};
-
-// Mock: series disponibles por producto+almacén
-const SERIES_DISPONIBLES = {
-  "33|2": [
-    { value: "21", label: "SER-ABC-00021" },
-    { value: "22", label: "SER-ABC-00022" },
-  ],
-  "33|1": [{ value: "40", label: "SER-XYZ-00040" }],
-};
 
 function money(n) {
   const v = Number(n || 0);
@@ -79,12 +49,28 @@ function statusBadge(status) {
 }
 
 export default function VentaBorradorView() {
+  const router = useRouter();
+  
+  // Estado para clientes cargados desde la API
+  const [clientes, setClientes] = useState([]);
+  const [loadingClientes, setLoadingClientes] = useState(true);
+
+  // Estado para almacenes cargados desde la API
+  const [almacenes, setAlmacenes] = useState([]);
+  const [loadingAlmacenes, setLoadingAlmacenes] = useState(true);
+
+  // Estado para búsqueda de items vendibles
+  const [itemsVendibles, setItemsVendibles] = useState([]);
+  const [loadingItemsVendibles, setLoadingItemsVendibles] = useState(false);
+  const [busquedaProducto, setBusquedaProducto] = useState('');
+  const [debouncedBusqueda] = useDebouncedValue(busquedaProducto, 300);
+
   // Estado venta (mock). En real: viene de sp_get_venta o endpoint GET /ventas/:id
   const [venta, setVenta] = useState({
-    id: 123, // en real: nueva_venta_id
+    id: null, // se crea al presionar "Agregar Producto"
     estado: "BORRADOR",
-    clienteId: "1", // consumidor final por defecto
-    almacenId: "2",
+    clienteId: "2", // cliente con ID 2 por defecto
+    almacenId: "2", // se actualizará desde localStorage en useEffect
     tipoComprobante: "TICKET",
     nroComprobante: "",
     observaciones: "",
@@ -93,32 +79,215 @@ export default function VentaBorradorView() {
   // Ítems (mock). En real: vienen de ventas_detalle (sp_get_venta)
   const [items, setItems] = useState([]);
 
+  // Cargar almacén desde localStorage (solo en el cliente)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const almacenGuardado = localStorage.getItem('almacen_seleccionado');
+      if (almacenGuardado) {
+        try {
+          const obj = JSON.parse(almacenGuardado);
+          if (obj && obj.id) {
+            setVenta(v => ({ ...v, almacenId: String(obj.id) }));
+            return;
+          }
+        } catch (e) {
+          console.warn('No se pudo parsear almacen_seleccionado:', e);
+        }
+      }
+
+      // Fallback legacy: si existe clave antigua con el ID como string
+      const legacyId = localStorage.getItem('almacenId');
+      if (legacyId) {
+        setVenta(v => ({ ...v, almacenId: legacyId }));
+      }
+    }
+  }, []);
+
+  // Cargar clientes desde la API
+  useEffect(() => {
+    const fetchClientes = async () => {
+      try {
+        setLoadingClientes(true);
+        const response = await fetch('/api/stock/clientes');
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          // Formatear clientes para el Select
+          const clientesFormateados = data.data.map(cliente => ({
+            value: cliente.id.toString(),
+            label: cliente.nombre
+          }));
+          setClientes(clientesFormateados);
+        } else {
+          console.error('Error cargando clientes:', data.message);
+          // Fallback a mock en caso de error
+          setClientes([
+            { value: "1", label: "Consumidor final" },
+            { value: "2", label: "Cliente por defecto" },
+          ]);
+        }
+      } catch (error) {
+        console.error('Error en fetch clientes:', error);
+        // Fallback a mock en caso de error
+        setClientes([
+          { value: "1", label: "Consumidor final" },
+          { value: "2", label: "Cliente por defecto" },
+        ]);
+      } finally {
+        setLoadingClientes(false);
+      }
+    };
+
+    const fetchAlmacenes = async () => {
+      try {
+        setLoadingAlmacenes(true);
+        const response = await fetch('/api/stock/almacenes?solo_activos=1');
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          // Formatear almacenes para el Select
+          const almacenesFormateados = data.data.map(almacen => ({
+            value: almacen.id.toString(),
+            label: almacen.nombre
+          }));
+          setAlmacenes(almacenesFormateados);
+          
+          // Si no hay almacén en localStorage y hay almacenes, usar el primero
+          if (typeof window !== 'undefined') {
+            const almacenActual = localStorage.getItem('almacenId');
+            if (!almacenActual && almacenesFormateados.length > 0) {
+              const primerAlmacen = almacenesFormateados[0].value;
+              localStorage.setItem('almacenId', primerAlmacen);
+              setVenta(v => ({ ...v, almacenId: primerAlmacen }));
+            }
+          }
+        } else {
+          console.error('Error cargando almacenes:', data.message);
+          // Fallback a mock en caso de error
+          setAlmacenes([
+            { value: "2", label: "Almacén por defecto" },
+            { value: "1", label: "Casa Central" },
+          ]);
+        }
+      } catch (error) {
+        console.error('Error en fetch almacenes:', error);
+        // Fallback a mock en caso de error
+        setAlmacenes([
+          { value: "2", label: "Almacén por defecto" },
+          { value: "1", label: "Casa Central" },
+        ]);
+      } finally {
+        setLoadingAlmacenes(false);
+      }
+    };
+
+    fetchClientes();
+    fetchAlmacenes();
+  }, []);
+
+  // Función para buscar items vendibles
+  const buscarItemsVendibles = useCallback(async (query = '') => {
+    // Resolver almacen_id desde localStorage (objeto almacen_seleccionado) o fallbacks
+    let almacenIdParam = null;
+    if (typeof window !== 'undefined') {
+      const almacenStr = localStorage.getItem('almacen_seleccionado');
+      if (almacenStr) {
+        try {
+          const obj = JSON.parse(almacenStr);
+          if (obj && obj.id) almacenIdParam = String(obj.id);
+        } catch (_) {}
+      }
+      if (!almacenIdParam) {
+        const legacy = localStorage.getItem('almacenId');
+        if (legacy) almacenIdParam = legacy;
+      }
+    }
+    if (!almacenIdParam) almacenIdParam = venta.almacenId ? String(venta.almacenId) : null;
+    if (!almacenIdParam || isNaN(parseInt(almacenIdParam)) || parseInt(almacenIdParam) <= 0) {
+      console.warn('almacen_id inválido para búsqueda de vendibles:', almacenIdParam);
+      return;
+    }
+
+    setLoadingItemsVendibles(true);
+    try {
+      const params = new URLSearchParams({
+        almacen_id: String(parseInt(almacenIdParam)),
+        limite: '50'
+      });
+      if (query && query.trim()) params.set('q', query.trim());
+
+      const response = await fetch(`/api/stock/productos/vendibles?${params}`);
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setItemsVendibles(data.data || []);
+      } else {
+        console.error('Error buscando items vendibles:', data.message);
+        setItemsVendibles([]);
+      }
+    } catch (error) {
+      console.error('Error en búsqueda de items vendibles:', error);
+      setItemsVendibles([]);
+    } finally {
+      setLoadingItemsVendibles(false);
+    }
+  }, [venta.almacenId]);
+  
+  // Buscar items cuando cambia el almacén o la búsqueda
+  useEffect(() => {
+    if (venta.almacenId) {
+      buscarItemsVendibles(debouncedBusqueda);
+    }
+  }, [venta.almacenId, debouncedBusqueda, buscarItemsVendibles]);
+
   // Modal "Agregar ítem"
   const [opened, { open, close }] = useDisclosure(false);
 
-  // Form modal
-  const [productoId, setProductoId] = useState(null);
-  const productoSeleccionado = useMemo(
-    () => PRODUCTOS.find((p) => p.value === productoId) || null,
-    [productoId]
-  );
+  // Form modal - selección múltiple de items vendibles
+  const [selectedKeys, setSelectedKeys] = useState([]); // array de keys
+  const [selectedItems, setSelectedItems] = useState({}); // key -> item
+  const [cantidadesSel, setCantidadesSel] = useState({}); // key -> cantidad
+  const [preciosSel, setPreciosSel] = useState({}); // key -> precio unitario
 
-  const [cantidad, setCantidad] = useState(1);
-  const [precioUnitario, setPrecioUnitario] = useState(null);
-  const [loteId, setLoteId] = useState(null);
-  const [serieId, setSerieId] = useState(null);
+  const getItemKey = useCallback((it) => `${it.item_tipo}|${it.producto_id}|${it.lote_id || ''}|${it.serie_id || ''}`, []);
 
-  const lotesDisponibles = useMemo(() => {
-    if (!productoSeleccionado) return [];
-    const key = `${productoSeleccionado.value}|${venta.almacenId}`;
-    return LOTES_DISPONIBLES[key] || [];
-  }, [productoSeleccionado, venta.almacenId]);
+  const addSeleccion = (item) => {
+    const key = getItemKey(item);
+    setSelectedKeys((prev) => {
+      if (prev.includes(key)) {
+        // Si ya está seleccionado: para UNIDAD/LOTE incrementa cantidad en 1, para SERIE ignora
+        if (item.item_tipo !== 'SERIE') {
+          setCantidadesSel((pc) => {
+            const actual = Number(pc[key] ?? 1);
+            const max = Number(item.stock_disponible) || Infinity;
+            const nuevo = Math.min(actual + 1, max);
+            return { ...pc, [key]: nuevo };
+          });
+        }
+        return prev;
+      }
+      // Nuevo seleccionado
+      setSelectedItems((pi) => ({ ...pi, [key]: item }));
+      setCantidadesSel((pc) => ({ ...pc, [key]: item.item_tipo === 'SERIE' ? 1 : 1 }));
+      setPreciosSel((pp) => ({ ...pp, [key]: Number(item.precio_lista) || 0 }));
+      return [...prev, key];
+    });
+  };
 
-  const seriesDisponibles = useMemo(() => {
-    if (!productoSeleccionado) return [];
-    const key = `${productoSeleccionado.value}|${venta.almacenId}`;
-    return SERIES_DISPONIBLES[key] || [];
-  }, [productoSeleccionado, venta.almacenId]);
+  const removeSeleccion = (key) => {
+    setSelectedKeys((prev) => prev.filter((k) => k !== key));
+    setSelectedItems((pi) => { const copy = { ...pi }; delete copy[key]; return copy; });
+    setCantidadesSel((pc) => { const copy = { ...pc }; delete copy[key]; return copy; });
+    setPreciosSel((pp) => { const copy = { ...pp }; delete copy[key]; return copy; });
+  };
+
+  const setCantidadItem = (key, value) => {
+    setCantidadesSel((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const setPrecioItem = (key, value) => {
+    setPreciosSel((prev) => ({ ...prev, [key]: value }));
+  };
 
   const total = useMemo(() => {
     return items.reduce((acc, it) => acc + Number(it.cantidad) * Number(it.precioUnitario), 0);
@@ -126,65 +295,262 @@ export default function VentaBorradorView() {
 
   const editable = venta.estado === "BORRADOR";
 
+  // Función para manejar cambio de almacén y guardarlo en localStorage
+  const handleAlmacenChange = (value) => {
+    if (value) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('almacenId', value);
+      }
+      setVenta((v) => ({ ...v, almacenId: value }));
+    }
+  };
+
   function resetModal() {
-    setProductoId(null);
-    setCantidad(1);
-    setPrecioUnitario(null);
-    setLoteId(null);
-    setSerieId(null);
+    setSelectedKeys([]);
+    setSelectedItems({});
+    setCantidadesSel({});
+    setPreciosSel({});
+    setBusquedaProducto('');
   }
 
-  function onOpenAdd() {
+  const { data: session, status: sessionStatus } = useStableSession();
+  const [creandoVenta, setCreandoVenta] = useState(false);
+  const loadItemsVenta = useCallback(async (ventaId) => {
+    try {
+      if (!ventaId) return;
+      const resp = await fetch(`/api/stock/ventas/items?venta_id=${ventaId}`);
+      const data = await resp.json();
+      if (!resp.ok || !data.success) {
+        console.error('Error cargando ítems de la venta:', data?.message);
+        return;
+      }
+      const mapped = (data.data || []).map((r) => ({
+        id: r.venta_detalle_id,
+        productoId: r.producto_id,
+        productoNombre: r.producto_nombre,
+        tipo: r.tipo_control_stock,
+        cantidad: r.cantidad,
+        precioUnitario: r.precio_unitario,
+        loteId: r.lote_id,
+        serieId: r.serie_id,
+        codigoLote: r.codigo_lote,
+        fechaVencimiento: r.fecha_vencimiento,
+        numeroSerie: r.numero_serie,
+      }));
+      setItems(mapped);
+    } catch (e) {
+      console.error('Error inesperado cargando ítems de la venta:', e);
+    }
+  }, []);
+
+  // Cargar venta existente para edición si viene query.id
+  useEffect(() => {
+    const loadVentaEdicion = async () => {
+      try {
+        if (!router?.query?.id) return;
+        const ventaId = parseInt(router.query.id);
+        if (!ventaId) return;
+        const resp = await fetch(`/api/stock/ventas/edicion?venta_id=${ventaId}`);
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          alert(data?.message || 'No se pudo cargar la venta para edición');
+          return;
+        }
+        const v = data.data.venta;
+        setVenta((prev) => ({
+          ...prev,
+          id: v.id,
+          estado: v.estado,
+          clienteId: String(v.cliente_id),
+          almacenId: String(v.almacen_id),
+          tipoComprobante: v.tipo_comprobante,
+          nroComprobante: v.nro_comprobante || '',
+          observaciones: v.observaciones || '',
+        }));
+        const mapped = (data.data.items || []).map((r) => ({
+          id: r.venta_detalle_id,
+          productoId: r.producto_id,
+          productoNombre: r.producto_nombre,
+          tipo: r.tipo_control_stock,
+          cantidad: r.cantidad,
+          precioUnitario: r.precio_unitario,
+          loteId: r.lote_id,
+          serieId: r.serie_id,
+          codigoLote: r.codigo_lote,
+          fechaVencimiento: r.fecha_vencimiento,
+          numeroSerie: r.numero_serie,
+        }));
+        setItems(mapped);
+      } catch (e) {
+        console.error('Error cargando venta para edición:', e);
+      }
+    };
+    loadVentaEdicion();
+  }, [router.query?.id]);
+
+  async function onOpenAdd() {
     if (!editable) return;
     resetModal();
-    open();
-  }
 
-  function validateAndAdd() {
-    if (!productoSeleccionado) return alert("Seleccioná un producto.");
-
-    const tipo = productoSeleccionado.tipo;
-
-    // Defaults
-    const precio = precioUnitario ?? productoSeleccionado.precioSugerido ?? 0;
-
-    if (tipo === "SERIE") {
-      // en serie, 1 por ítem
-      if (!serieId) return alert("Seleccioná una serie.");
-      const exists = items.some((x) => x.tipo === "SERIE" && x.serieId === serieId);
-      if (exists) return alert("Esa serie ya está agregada en la venta.");
-      const newItem = {
-        id: crypto.randomUUID(),
-        productoId: productoSeleccionado.value,
-        productoNombre: productoSeleccionado.label,
-        tipo,
-        cantidad: 1,
-        precioUnitario: precio,
-        loteId: null,
-        serieId,
-      };
-      setItems((prev) => [...prev, newItem]);
-      close();
+    // Si la venta ya tiene id, solo abrir modal
+    if (venta.id) {
+      open();
       return;
     }
 
-    // UNIDAD / LOTE
-    if (!cantidad || cantidad <= 0) return alert("Cantidad inválida.");
-    if (tipo === "LOTE" && !loteId) return alert("Seleccioná un lote.");
+    // Crear venta en BORRADOR antes de abrir el modal
+    try {
+      setCreandoVenta(true);
 
-    const newItem = {
-      id: crypto.randomUUID(),
-      productoId: productoSeleccionado.value,
-      productoNombre: productoSeleccionado.label,
-      tipo,
-      cantidad: Number(cantidad),
-      precioUnitario: Number(precio),
-      loteId: tipo === "LOTE" ? loteId : null,
-      serieId: null,
-    };
+      // Obtener almacen_id preferentemente de localStorage (objeto almacen_seleccionado)
+      let almacenIdEnvio = null;
+      if (typeof window !== 'undefined') {
+        const almacenJSON = localStorage.getItem('almacen_seleccionado');
+        if (almacenJSON) {
+          try {
+            const obj = JSON.parse(almacenJSON);
+            if (obj && obj.id) {
+              almacenIdEnvio = String(obj.id);
+            }
+          } catch(e) {
+            // ignorar parse error
+          }
+        }
+        if (!almacenIdEnvio) {
+          const legacyId = localStorage.getItem('almacenId');
+          if (legacyId) almacenIdEnvio = legacyId;
+        }
+      }
+      if (!almacenIdEnvio) almacenIdEnvio = venta.almacenId;
 
-    setItems((prev) => [...prev, newItem]);
-    close();
+      const payload = {
+        cliente_id: parseInt(venta.clienteId),
+        almacen_id: parseInt(almacenIdEnvio),
+        tipo_comprobante: venta.tipoComprobante,
+        nro_comprobante: venta.nroComprobante || '',
+        observaciones: venta.observaciones || '',
+        creado_por: session?.user?.id ? parseInt(session.user.id) : null,
+        presupuesto_id: null,
+      };
+
+      if (!payload.creado_por) {
+        alert('No se puede crear la venta: usuario no autenticado.');
+        setCreandoVenta(false);
+        return;
+      }
+
+      const resp = await fetch('/api/stock/ventas/crear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+
+      if (!resp.ok || !data.success) {
+        console.error('Error creando venta:', data);
+        alert(data?.message || 'No se pudo crear la venta');
+        setCreandoVenta(false);
+        return;
+      }
+
+      const nuevaId = data?.data?.venta_id;
+      setVenta((v) => ({ ...v, id: nuevaId }));
+      await loadItemsVenta(nuevaId);
+      open();
+    } catch (err) {
+      console.error('Error inesperado creando venta:', err);
+      alert('Error inesperado al crear la venta');
+    } finally {
+      setCreandoVenta(false);
+    }
+  }
+
+  const [agregandoItems, setAgregandoItems] = useState(false);
+
+  async function validateAndAdd() {
+    if (!selectedKeys.length) return alert('Seleccioná al menos un item.');
+    if (!venta.id) return alert('La venta aún no fue creada. Cierra y vuelve a intentar.');
+
+    const nuevos = [];
+    // Validaciones previas y construcción de payloads
+    const payloads = [];
+    for (const key of selectedKeys) {
+      const it = selectedItems[key];
+      if (!it) continue;
+      const tipo = it.item_tipo;
+      const precio = Number(preciosSel[key] ?? it.precio_lista ?? 0);
+      const cantidad = tipo === 'SERIE' ? 1 : Number(cantidadesSel[key] ?? 1);
+
+      if (tipo !== 'SERIE') {
+        if (!cantidad || cantidad <= 0) {
+          alert(`Cantidad inválida para ${it.producto_nombre}`);
+          return;
+        }
+        if (Number(it.stock_disponible) && cantidad > Number(it.stock_disponible)) {
+          alert(`Stock insuficiente para ${it.producto_nombre}. Disponible: ${it.stock_disponible}`);
+          return;
+        }
+      }
+
+      if (tipo === 'SERIE') {
+        const exists = items.some((x) => x.tipo === 'SERIE' && x.serieId === it.serie_id);
+        if (exists) {
+          alert(`La serie ${it.numero_serie} ya está agregada.`);
+          return;
+        }
+      }
+
+      payloads.push({
+        venta_id: parseInt(venta.id),
+        producto_id: parseInt(it.producto_id),
+        cantidad: Number(cantidad),
+        precio_unitario: Number(precio),
+        lote_id: tipo === 'LOTE' ? parseInt(it.lote_id) : null,
+        serie_id: tipo === 'SERIE' ? parseInt(it.serie_id) : null,
+      });
+
+      const newItem = {
+        id: crypto.randomUUID(),
+        productoId: it.producto_id,
+        productoNombre: it.producto_nombre,
+        tipo,
+        cantidad: cantidad,
+        precioUnitario: precio,
+        loteId: tipo === 'LOTE' ? it.lote_id : null,
+        serieId: tipo === 'SERIE' ? it.serie_id : null,
+        sku: it.sku,
+        codigoBarras: it.codigo_barras,
+        codigoLote: tipo === 'LOTE' ? it.codigo_lote : null,
+        fechaVencimiento: tipo === 'LOTE' ? it.fecha_vencimiento : null,
+        numeroSerie: tipo === 'SERIE' ? it.numero_serie : null,
+        stockDisponible: it.stock_disponible,
+      };
+      nuevos.push(newItem);
+    }
+
+    // Persistir cada item con el SP vía API
+    try {
+      setAgregandoItems(true);
+      for (const p of payloads) {
+        const resp = await fetch('/api/stock/ventas/items/agregar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(p),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          throw new Error(data?.message || 'No se pudo agregar un ítem a la venta');
+        }
+      }
+      await loadItemsVenta(venta.id);
+      close();
+      resetModal();
+    } catch (e) {
+      console.error('Error agregando ítems a la venta:', e);
+      alert(e.message || 'Error al agregar ítems a la venta');
+    } finally {
+      setAgregandoItems(false);
+    }
   }
 
   function removeItem(itemId) {
@@ -192,24 +558,76 @@ export default function VentaBorradorView() {
     setItems((prev) => prev.filter((x) => x.id !== itemId));
   }
 
-  function confirmarVenta() {
+  const [confirmando, setConfirmando] = useState(false);
+  async function confirmarVenta() {
     if (!editable) return;
     if (items.length === 0) return alert("Agregá al menos 1 ítem antes de confirmar.");
-    // En real: POST /ventas/:id/confirmar -> CALL sp_confirmar_venta(ventaId)
-    setVenta((v) => ({ ...v, estado: "CONFIRMADA" }));
+    if (!venta.id) return alert('La venta aún no fue creada.');
+
+    try {
+      setConfirmando(true);
+      const resp = await fetch('/api/stock/ventas/confirmar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ venta_id: parseInt(venta.id) }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.success) {
+        alert(data?.message || 'No se pudo confirmar la venta');
+        return;
+      }
+      setVenta((v) => ({ ...v, estado: 'CONFIRMADA' }));
+    } catch (e) {
+      console.error('Error confirmando venta:', e);
+      alert(e.message || 'Error al confirmar la venta');
+    } finally {
+      setConfirmando(false);
+    }
   }
 
-  function anularVenta() {
+  const [anulando, setAnulando] = useState(false);
+  async function anularVenta() {
     if (venta.estado !== "CONFIRMADA") return;
-    // En real: POST /ventas/:id/anular -> CALL sp_anular_venta(ventaId)
-    setVenta((v) => ({ ...v, estado: "ANULADA" }));
+    if (!venta.id) return alert('La venta aún no fue creada.');
+    if (!confirm('¿Seguro que deseas anular esta venta? Esta acción revertirá los movimientos de stock.')) return;
+    try {
+      setAnulando(true);
+      const resp = await fetch('/api/stock/ventas/anular', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ venta_id: parseInt(venta.id) }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.success) {
+        alert(data?.message || 'No se pudo anular la venta');
+        return;
+      }
+      setVenta((v) => ({ ...v, estado: 'ANULADA' }));
+    } catch (e) {
+      console.error('Error anulando venta:', e);
+      alert(e.message || 'Error al anular la venta');
+    } finally {
+      setAnulando(false);
+    }
   }
 
   return (
-    <Box p="md">
-      <Flex justify="space-between" align="center" mb="md">
-        <Stack gap={2}>
-          <Title order={3}>Venta #{venta.id}</Title>
+    <ProtectedLayout>
+      <Container size="xl">
+        <Grid mt={20}>
+          <Grid.Col span={12}>
+            <Flex justify="space-between" align="center" mb="md">
+              <Stack gap={2}>
+                <Group>
+                  <Button 
+                    variant="subtle" 
+                    leftSection={<IconArrowLeft size={16} />}
+                    onClick={() => router.push('/stock/ventas')}
+                  >
+                    Volver a Ventas
+                  </Button>
+                </Group>
+                <Title order={2}>Nueva Venta #{venta.id}</Title>
           <Group gap="sm">
             {statusBadge(venta.estado)}
             <Text size="sm" c="dimmed">
@@ -218,120 +636,178 @@ export default function VentaBorradorView() {
           </Group>
         </Stack>
 
-        <Group>
-          <Button
-            leftSection={<IconCheck size={16} />}
-            onClick={confirmarVenta}
-            disabled={!editable}
-          >
-            Confirmar
-          </Button>
-          <Button
-            leftSection={<IconX size={16} />}
-            color="red"
-            variant="light"
-            onClick={anularVenta}
-            disabled={venta.estado !== "CONFIRMADA"}
-          >
-            Anular
-          </Button>
-        </Group>
-      </Flex>
+              <Group>
+                <Button
+                  leftSection={<IconCheck size={16} />}
+                  onClick={confirmarVenta}
+                  disabled={!editable || confirmando}
+                  loading={confirmando}
+                  color="green"
+                >
+                  Confirmar
+                </Button>
+                <Button
+                  leftSection={<IconX size={16} />}
+                  color="red"
+                  variant="light"
+                  onClick={anularVenta}
+                  disabled={venta.estado !== "CONFIRMADA" || anulando}
+                  loading={anulando}
+                >
+                  Anular
+                </Button>
+              </Group>
+            </Flex>
+          </Grid.Col>
+
+          <Grid.Col span={12}>
 
       <Card withBorder radius="md" mb="md">
-        <Title order={5} mb="sm">
-          Cabecera
+        <Title order={4} mb="sm">
+          Información de la Venta
         </Title>
 
-        <Group grow align="flex-end">
-          <Select
-            label="Cliente"
-            data={CLIENTES}
-            value={venta.clienteId}
-            onChange={(value) => setVenta((v) => ({ ...v, clienteId: value }))}
-            disabled={!editable}
-            description="Por defecto: Consumidor final"
-          />
-          <Select
-            label="Almacén"
-            data={ALMACENES}
-            value={venta.almacenId}
-            onChange={(value) => setVenta((v) => ({ ...v, almacenId: value }))}
-            disabled={!editable || items.length > 0}
-            description={items.length > 0 ? "Bloqueado si ya cargaste ítems" : "Elegilo antes de cargar ítems"}
-          />
-          <Select
-            label="Tipo comprobante"
-            data={[
-              { value: "TICKET", label: "TICKET" },
-              { value: "REMITO", label: "REMITO" },
-              { value: "FACTURA_INTERNA", label: "FACTURA_INTERNA" },
-            ]}
-            value={venta.tipoComprobante}
-            onChange={(value) => setVenta((v) => ({ ...v, tipoComprobante: value }))}
-            disabled={!editable}
-          />
-          <TextInput
-            label="Nro comprobante"
-            value={venta.nroComprobante}
-            onChange={(e) => setVenta((v) => ({ ...v, nroComprobante: e.currentTarget.value }))}
-            disabled={!editable}
-            placeholder="Opcional"
-          />
-        </Group>
-
-        <TextInput
-          mt="sm"
-          label="Observaciones"
-          value={venta.observaciones}
-          onChange={(e) => setVenta((v) => ({ ...v, observaciones: e.currentTarget.value }))}
-          disabled={!editable}
-          placeholder="Opcional"
-        />
+        <Grid>
+          <Grid.Col span={6} md={3}>
+            <Select
+              label="Cliente"
+              data={clientes}
+              value={venta.clienteId}
+              onChange={(value) => setVenta((v) => ({ ...v, clienteId: value }))}
+              disabled={!editable || loadingClientes}
+              description={loadingClientes ? "Cargando clientes..." : "Por defecto: Cliente ID 2"}
+              searchable
+              placeholder={loadingClientes ? "Cargando..." : "Buscar cliente..."}
+            />
+          </Grid.Col>
+          <Grid.Col span={6} md={3}>
+            <Select
+              label="Almacén"
+              data={almacenes}
+              value={venta.almacenId}
+              onChange={handleAlmacenChange}
+              disabled={!editable || items.length > 0 || loadingAlmacenes}
+              description={
+                loadingAlmacenes 
+                  ? "Cargando almacenes..." 
+                  : items.length > 0 
+                    ? "Bloqueado si ya cargaste ítems" 
+                    : "Almacén desde localStorage"
+              }
+              searchable
+              placeholder={loadingAlmacenes ? "Cargando..." : "Buscar almacén..."}
+            />
+          </Grid.Col>
+          <Grid.Col span={6} md={3}>
+            <Select
+              label="Tipo comprobante"
+              data={[
+                { value: "TICKET", label: "TICKET" },
+                { value: "REMITO", label: "REMITO" },
+                { value: "FACTURA_INTERNA", label: "FACTURA_INTERNA" },
+              ]}
+              value={venta.tipoComprobante}
+              onChange={(value) => setVenta((v) => ({ ...v, tipoComprobante: value }))}
+              disabled={!editable}
+            />
+          </Grid.Col>
+          <Grid.Col span={6} md={3}>
+            <TextInput
+              label="Nro comprobante"
+              value={venta.nroComprobante}
+              onChange={(e) => setVenta((v) => ({ ...v, nroComprobante: e.currentTarget.value }))}
+              disabled={!editable}
+              placeholder="Opcional"
+            />
+          </Grid.Col>
+          <Grid.Col span={12}>
+            <TextInput
+              label="Observaciones"
+              value={venta.observaciones}
+              onChange={(e) => setVenta((v) => ({ ...v, observaciones: e.currentTarget.value }))}
+              disabled={!editable}
+              placeholder="Opcional"
+            />
+          </Grid.Col>
+        </Grid>
       </Card>
+          </Grid.Col>
 
-      <Card withBorder radius="md">
-        <Group justify="space-between" mb="sm">
-          <Title order={5}>Ítems</Title>
-          <Button leftSection={<IconPlus size={16} />} onClick={onOpenAdd} disabled={!editable}>
-            Agregar ítem
-          </Button>
-        </Group>
+          <Grid.Col span={12}>
+            <Card withBorder radius="md">
+              <Group justify="space-between" mb="sm">
+                <Title order={4}>Productos</Title>
+                <Button leftSection={<IconPlus size={16} />} onClick={onOpenAdd} disabled={!editable} variant="outline" color="#EE0E0F">
+                  Agregar Producto
+                </Button>
+              </Group>
 
         <Divider mb="sm" />
 
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Producto</Table.Th>
-              <Table.Th>Tipo</Table.Th>
-              <Table.Th>Detalle</Table.Th>
-              <Table.Th ta="right">Cantidad</Table.Th>
-              <Table.Th ta="right">Precio</Table.Th>
-              <Table.Th ta="right">Subtotal</Table.Th>
+              <Table.Th ta="center">Producto</Table.Th>
+              <Table.Th ta="center">Tipo</Table.Th>
+              <Table.Th ta="center">Detalle</Table.Th>
+              <Table.Th ta="center">Cantidad</Table.Th>
+              <Table.Th ta="center">Precio</Table.Th>
+              <Table.Th ta="center">Subtotal</Table.Th>
               <Table.Th ta="center">Acciones</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {items.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={7}>
+                <Table.Td colSpan={7} ta="center">
                   <Text c="dimmed">Sin ítems. Agregá productos para armar la venta.</Text>
                 </Table.Td>
               </Table.Tr>
             ) : (
               items.map((it) => (
                 <Table.Tr key={it.id}>
-                  <Table.Td>{it.productoNombre}</Table.Td>
-                  <Table.Td>{it.tipo}</Table.Td>
-                  <Table.Td>
-                    {it.tipo === "LOTE" && <Text size="sm">Lote id: {it.loteId}</Text>}
-                    {it.tipo === "SERIE" && <Text size="sm">Serie id: {it.serieId}</Text>}
-                    {it.tipo === "UNIDAD" && <Text size="sm" c="dimmed">-</Text>}
+                  <Table.Td ta="center">
+                    <Stack gap={2}>
+                      <Text fw={500}>{it.productoNombre}</Text>
+                      {it.sku && <Text size="xs" c="dimmed">SKU: {it.sku}</Text>}
+                      {it.codigoBarras && <Text size="xs" c="dimmed">Código: {it.codigoBarras}</Text>}
+                    </Stack>
                   </Table.Td>
-                  <Table.Td ta="right">{it.cantidad}</Table.Td>
-                  <Table.Td ta="right">{money(it.precioUnitario)}</Table.Td>
-                  <Table.Td ta="right">{money(it.cantidad * it.precioUnitario)}</Table.Td>
+                  <Table.Td ta="center">
+                    <Badge 
+                      color={
+                        it.tipo === "UNIDAD" ? "blue" : 
+                        it.tipo === "LOTE" ? "green" : 
+                        "purple"
+                      }
+                      variant="light"
+                    >
+                      {it.tipo}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td ta="center">
+                    <Stack gap={2}>
+                      {it.tipo === "LOTE" && (
+                        <>
+                          <Text size="sm">Lote: {it.codigoLote}</Text>
+                          {it.fechaVencimiento && (
+                            <Text size="xs" c="orange">
+                              Vence: {new Date(it.fechaVencimiento).toLocaleDateString()}
+                            </Text>
+                          )}
+                        </>
+                      )}
+                      {it.tipo === "SERIE" && (
+                        <Text size="sm">Serie: {it.numeroSerie}</Text>
+                      )}
+                      {it.tipo === "UNIDAD" && (
+                        it.stockDisponible != null && <Text size="sm" c="dimmed">Stock: {it.stockDisponible}</Text>
+                      )}
+                    </Stack>
+                  </Table.Td>
+                  <Table.Td ta="center">{it.cantidad}</Table.Td>
+                  <Table.Td ta="center">{money(it.precioUnitario)}</Table.Td>
+                  <Table.Td ta="center">{money(it.cantidad * it.precioUnitario)}</Table.Td>
                   <Table.Td ta="center">
                     <Group justify="center" gap="xs">
                       <Tooltip label="Editar (mock)">
@@ -378,85 +854,167 @@ export default function VentaBorradorView() {
           close();
           resetModal();
         }}
-        title="Agregar ítem"
+        title="Agregar ítem a la venta"
         centered
-        size="lg"
+        size="xl"
       >
         <Stack>
-          <Select
-            label="Producto"
-            data={PRODUCTOS}
-            value={productoId}
-            onChange={(value) => {
-              setProductoId(value);
-              const p = PRODUCTOS.find((x) => x.value === value);
-              setPrecioUnitario(p?.precioSugerido ?? 0);
-              setCantidad(1);
-              setLoteId(null);
-              setSerieId(null);
-            }}
-            searchable
-            nothingFoundMessage="Sin resultados"
+          <TextInput
+            label="Buscar producto"
+            placeholder="Buscar por nombre, SKU, código de barras, lote o serie..."
+            leftSection={<IconSearch size={16} />}
+            value={busquedaProducto}
+            onChange={(event) => setBusquedaProducto(event.currentTarget.value)}
+            description="Escribe para buscar productos disponibles en el almacén seleccionado"
           />
-
-          {productoSeleccionado && (
-            <Group grow>
-              {productoSeleccionado.tipo !== "SERIE" ? (
-                <NumberInput
-                  label="Cantidad"
-                  value={cantidad}
-                  onChange={setCantidad}
-                  min={0}
-                  decimalScale={3}
-                />
-              ) : (
-                <TextInput label="Cantidad" value="1 (fijo por serie)" disabled />
-              )}
-
-              <NumberInput
-                label="Precio unitario"
-                value={precioUnitario}
-                onChange={setPrecioUnitario}
-                min={0}
-                decimalScale={2}
-              />
+          
+          {loadingItemsVendibles && (
+            <Group justify="center" p="md">
+              <Loader size="sm" />
+              <Text size="sm">Buscando productos...</Text>
             </Group>
           )}
-
-          {productoSeleccionado?.tipo === "LOTE" && (
-            <Select
-              label="Lote"
-              data={lotesDisponibles}
-              value={loteId}
-              onChange={setLoteId}
-              placeholder="Seleccioná lote con stock"
-              searchable
-              nothingFoundMessage="No hay lotes con stock"
-              description="En real: lo trae un endpoint/sp de lotes disponibles por almacén"
-            />
+          
+          {!loadingItemsVendibles && itemsVendibles.length > 0 && (
+            <>
+              <Text size="sm" fw={500}>Productos encontrados ({itemsVendibles.length}):</Text>
+              <Stack gap={"xs"} mah={320} style={{ overflowY: 'auto' }}>
+                {itemsVendibles.map((item) => {
+                  const key = getItemKey(item);
+                  return (
+                    <Card
+                      key={key}
+                      withBorder
+                      padding="sm"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => addSeleccion(item)}
+                    >
+                      <Grid align="center">
+                        <Grid.Col span={8}>
+                          <Stack gap={2}>
+                            <Group>
+                              <Text fw={500} size="sm">{item.display_text}</Text>
+                              <Badge size="xs" color={item.item_tipo === 'UNIDAD' ? 'blue' : item.item_tipo === 'LOTE' ? 'green' : 'purple'}>
+                                {item.item_tipo}
+                              </Badge>
+                            </Group>
+                            {item.sku && <Text size="xs" c="dimmed">SKU: {item.sku}</Text>}
+                            {item.codigo_barras && <Text size="xs" c="dimmed">Código: {item.codigo_barras}</Text>}
+                          </Stack>
+                        </Grid.Col>
+                        <Grid.Col span={4}>
+                          <Stack gap={2} align="flex-end">
+                            <Text size="sm" fw={500}>{money(Number(item.precio_lista) || 0)}</Text>
+                            <Text size="xs" c="green">Stock: {item.stock_disponible}</Text>
+                          </Stack>
+                        </Grid.Col>
+                      </Grid>
+                    </Card>
+                  );
+                })}
+              </Stack>
+            </>
+          )}
+          
+          {!loadingItemsVendibles && itemsVendibles.length === 0 && busquedaProducto.trim() && (
+            <Text c="dimmed" ta="center" p="md">
+              No se encontraron productos que coincidan con "{busquedaProducto}"
+            </Text>
+          )}
+          
+          {!loadingItemsVendibles && itemsVendibles.length === 0 && !busquedaProducto.trim() && (
+            <Text c="dimmed" ta="center" p="md">
+              Escribe algo para buscar productos disponibles
+            </Text>
           )}
 
-          {productoSeleccionado?.tipo === "SERIE" && (
-            <Select
-              label="Serie"
-              data={seriesDisponibles}
-              value={serieId}
-              onChange={setSerieId}
-              placeholder="Seleccioná serie disponible"
-              searchable
-              nothingFoundMessage="No hay series disponibles"
-              description="En real: lo trae un endpoint/sp de series disponibles por almacén"
-            />
+          {selectedKeys.length > 0 && (
+            <Card withBorder p="md" mt="md">
+              <Stack>
+                <Group justify="space-between" align="center">
+                  <Text fw={500}>Seleccionados ({selectedKeys.length})</Text>
+                  <Text size="xs" c="dimmed">Edita cantidades y precios antes de agregar</Text>
+                </Group>
+                <Stack gap="xs" mah={240} style={{ overflowY: 'auto' }}>
+                  {selectedKeys.map((key) => {
+                    const it = selectedItems[key];
+                    if (!it) return null;
+                    return (
+                      <Card key={key} withBorder padding="xs">
+                        <Grid align="center">
+                          <Grid.Col span={7}>
+                            <Stack gap={2}>
+                              <Text size="sm" fw={500}>{it.producto_nombre}</Text>
+                              <Group gap={8}>
+                                <Badge size="xs" color={it.item_tipo === 'UNIDAD' ? 'blue' : it.item_tipo === 'LOTE' ? 'green' : 'purple'}>
+                                  {it.item_tipo}
+                                </Badge>
+                                {it.codigo_lote && <Text size="xs" c="dimmed">Lote: {it.codigo_lote}</Text>}
+                                {it.numero_serie && <Text size="xs" c="dimmed">Serie: {it.numero_serie}</Text>}
+                              </Group>
+                            </Stack>
+                          </Grid.Col>
+                          <Grid.Col span={4}>
+                            <Group justify="flex-end" gap="sm" wrap="nowrap">
+                              {it.item_tipo !== 'SERIE' ? (
+                                <NumberInput
+                                  label="Cant"
+                                  size="xs"
+                                  value={cantidadesSel[key] ?? 1}
+                                  onChange={(v) => setCantidadItem(key, v)}
+                                  min={0.001}
+                                  max={Number(it.stock_disponible) || undefined}
+                                  decimalScale={3}
+                                  styles={{ label: { marginBottom: 0 } }}
+                                />
+                              ) : (
+                                <NumberInput label="Cant" size="xs" value={1} disabled styles={{ label: { marginBottom: 0 } }} />
+                              )}
+                              <NumberInput
+                                label="Precio"
+                                size="xs"
+                                value={preciosSel[key] ?? (Number(it.precio_lista) || 0)}
+                                onChange={(v) => setPrecioItem(key, v)}
+                                min={0}
+                                decimalScale={2}
+                                styles={{ label: { marginBottom: 0 } }}
+                              />
+                            </Group>
+                          </Grid.Col>
+                          <Grid.Col span={1}>
+                            <Group justify="flex-end">
+                              <ActionIcon color="red" variant="subtle" onClick={() => removeSeleccion(key)}>
+                                <IconTrash size={16} />
+                              </ActionIcon>
+                            </Group>
+                          </Grid.Col>
+                        </Grid>
+                      </Card>
+                    );
+                  })}
+                </Stack>
+              </Stack>
+            </Card>
           )}
 
-          <Group justify="flex-end" mt="sm">
+          <Group justify="flex-end" mt="md">
             <Button variant="default" onClick={close}>
               Cancelar
             </Button>
-            <Button onClick={validateAndAdd}>Agregar</Button>
+            <Button 
+              onClick={validateAndAdd}
+              disabled={selectedKeys.length === 0 || agregandoItems}
+              loading={agregandoItems}
+              leftSection={<IconPlus size={16} />}
+            >
+              Agregar a la venta
+            </Button>
           </Group>
         </Stack>
       </Modal>
-    </Box>
+          </Grid.Col>
+        </Grid>
+      </Container>
+    </ProtectedLayout>
   );
 }

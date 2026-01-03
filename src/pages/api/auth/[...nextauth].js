@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import * as jwt from 'jose';
 
 export const authOptions = {
+    secret: process.env.NEXTAUTH_SECRET || "tu_jwt_secret_muy_seguro",
     providers: [
         CredentialsProvider({
             name: "Credentials",
@@ -71,7 +72,6 @@ export const authOptions = {
         updateAge: 24 * 60 * 60, // 24 horas - reduce frecuencia de actualizaciones
     },
     jwt: {
-        secret: "tu_jwt_secret_muy_seguro",
         maxAge: 8 * 60 * 60, // 8 horas
     },
     events: {

@@ -1,7 +1,7 @@
 // src/components/Auth/RouteGuard.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { Center, Loader, Stack, Text, Alert } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 
@@ -68,6 +68,15 @@ const RouteGuard = ({ children }) => {
                 const data = await response.json();
 
                 if (!response.ok) {
+                    // Manejo específico para token inválido
+                    if (response.status === 401 || (data.message && data.message.includes('Token inválido'))) {
+                        console.error('Token inválido, redirigiendo al login');
+                        setError('Su sesión ha expirado. Será redirigido al login.');
+                        setTimeout(() => {
+                            signOut({ callbackUrl: '/autenticacion/ingresar' });
+                        }, 2000);
+                        return;
+                    }
                     throw new Error(data.message || 'Error verificando permisos');
                 }
 
@@ -85,6 +94,18 @@ const RouteGuard = ({ children }) => {
                         });
 
                         const redirectData = await redirectResponse.json();
+
+                        if (!redirectResponse.ok) {
+                            // Manejo específico para token inválido en primera-ruta
+                            if (redirectResponse.status === 401 || (redirectData.message && redirectData.message.includes('Token inválido'))) {
+                                console.error('Token inválido en primera-ruta, redirigiendo al login');
+                                setError('Su sesión ha expirado. Será redirigido al login.');
+                                setTimeout(() => {
+                                    signOut({ callbackUrl: '/autenticacion/ingresar' });
+                                }, 2000);
+                                return;
+                            }
+                        }
 
                         if (redirectData.success && redirectData.ruta) {
                             setError(`No tiene permisos para acceder a esta página. Será redirigido a ${redirectData.funcionalidad}.`);
@@ -108,7 +129,16 @@ const RouteGuard = ({ children }) => {
 
             } catch (error) {
                 console.error('Error verificando autorización:', error);
-                setError('Error verificando permisos. Intente nuevamente.');
+                
+                // Manejo específico para errores de token inválido
+                if (error.message && error.message.includes('Token inválido')) {
+                    setError('Su sesión ha expirado. Será redirigido al login.');
+                    setTimeout(() => {
+                        signOut({ callbackUrl: '/autenticacion/ingresar' });
+                    }, 2000);
+                } else {
+                    setError('Error verificando permisos. Intente nuevamente.');
+                }
                 setAuthorized(false);
             } finally {
                 setLoading(false);
