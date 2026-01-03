@@ -57,7 +57,13 @@ export function useFuncionalidades() {
             return [];
         }
         
-        return funcionalidades.map(func => {
+        // Definir orden deseado
+        const ordenDeseado = [
+            'ventas', 'compras', 'productos', 'presupuesto', 'presupuestos', 
+            'proveedores', 'almacenes', 'clientes', 'dashboard', 'administracion'
+        ];
+        
+        const menuItems = funcionalidades.map(func => {
             const nombre = func.nombre.toLowerCase();
             
             // Usar directamente los datos de la base de datos
@@ -79,8 +85,7 @@ export function useFuncionalidades() {
             } else if (nombre === 'comercio' || nombre === 'ventas') {
                 menuItem.children = [
                     { label: 'Ventas', path: '/stock/ventas' },
-                    { label: 'Crear Venta', path: '/stock/ventas/crearventa' },
-                    { label: 'Compras', path: '/stock/compras' }
+                    { label: 'Crear Venta', path: '/stock/ventas/crearventa' }
                 ];
             } else if (nombre === 'administracion') {
                 menuItem.children = [
@@ -89,6 +94,31 @@ export function useFuncionalidades() {
             }
 
             return menuItem;
+        });
+
+        // Ordenar según el orden deseado
+        return menuItems.sort((a, b) => {
+            const nombreA = a.label.toLowerCase();
+            const nombreB = b.label.toLowerCase();
+            
+            const indexA = ordenDeseado.findIndex(item => 
+                nombreA.includes(item) || item.includes(nombreA)
+            );
+            const indexB = ordenDeseado.findIndex(item => 
+                nombreB.includes(item) || item.includes(nombreB)
+            );
+            
+            // Si ambos están en la lista, ordenar por índice
+            if (indexA !== -1 && indexB !== -1) {
+                return indexA - indexB;
+            }
+            
+            // Si solo uno está en la lista, ese va primero
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            
+            // Si ninguno está en la lista, mantener orden alfabético
+            return nombreA.localeCompare(nombreB);
         });
     };
 

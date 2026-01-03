@@ -1,6 +1,60 @@
 import { service_DBconn } from './db.js';
 
 /**
+ * Lista compras paginadas con filtros llamando al SP sp_listar_compras
+ * @param {Object} params
+ * @param {number|null} params.almacenId - ID del almacén o null
+ * @param {number|null} params.proveedorId - ID del proveedor o null  
+ * @param {string|null} params.estado - 'BORRADOR' | 'CONFIRMADA' | 'ANULADA' | null
+ * @param {string|null} params.fechaDesde - Fecha desde o null
+ * @param {string|null} params.fechaHasta - Fecha hasta o null
+ * @param {string|null} params.busqueda - Buscar en nro_comprobante y razon_social
+ * @param {number} params.limit - Límite de registros (default 50)
+ * @param {number} params.offset - Offset para paginación (default 0)
+ * @returns {Object} { success: boolean, message?: string, data?: { total: number, items: Array } }
+ */
+export async function service_ListarCompras({
+  almacenId = null,
+  proveedorId = null,
+  estado = null,
+  fechaDesde = null,
+  fechaHasta = null,
+  busqueda = null,
+  limit = 50,
+  offset = 0,
+}) {
+  let connection;
+  try {
+    connection = await service_DBconn();
+
+    // Preparar parámetros para el SP
+    const params = [
+      almacenId,
+      proveedorId, 
+      estado,
+      fechaDesde,
+      fechaHasta,
+      busqueda,
+      parseInt(limit),
+      parseInt(offset),
+    ];
+
+    const [rows] = await connection.execute('CALL sp_listar_compras(?, ?, ?, ?, ?, ?, ?, ?)', params);
+    
+    // El SP devuelve 2 resultsets: [0] = count, [1] = items
+    const total = rows[0]?.[0]?.total_count || 0;
+    const items = rows[1] || [];
+
+    return { success: true, data: { total, items } };
+  } catch (error) {
+    console.error('Error en service_ListarCompras:', error);
+    return { success: false, message: 'Error interno al listar compras', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+/**
  * Agrega un ítem a una compra en BORRADOR llamando al SP sp_agregar_item_compra
  * @param {Object} params
  * @param {number} params.compraId
