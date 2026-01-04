@@ -1,6 +1,37 @@
 import { service_DBconn } from './db.js';
 
 /**
+ * Obtiene el detalle completo de una compra llamando al SP sp_get_detalle_compra
+ * @param {number} compraId - ID de la compra
+ * @returns {Object} { success: boolean, message?: string, data?: { cabecera: Object, items: Array, movimientos: Array } }
+ */
+export async function service_GetDetalleCompra(compraId) {
+  let connection;
+  try {
+    if (!compraId) return { success: false, message: 'compra_id es requerido' };
+
+    connection = await service_DBconn();
+    const [rows] = await connection.execute('CALL sp_get_detalle_compra(?)', [parseInt(compraId)]);
+    
+    // El SP devuelve 3 resultsets: [0] = cabecera, [1] = items, [2] = movimientos
+    const cabecera = rows[0]?.[0] || null;
+    const items = rows[1] || [];
+    const movimientos = rows[2] || [];
+
+    if (!cabecera) {
+      return { success: false, message: 'Compra no encontrada' };
+    }
+
+    return { success: true, data: { cabecera, items, movimientos } };
+  } catch (error) {
+    console.error('Error en service_GetDetalleCompra:', error);
+    return { success: false, message: 'Error interno al obtener detalle de compra', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+/**
  * Lista compras paginadas con filtros llamando al SP sp_listar_compras
  * @param {Object} params
  * @param {number|null} params.almacenId - ID del almacén o null
@@ -219,6 +250,42 @@ export async function service_ListarItemsCompra(compraId) {
       return { success: false, message: error.sqlMessage || 'Error de validación', error: 'VALIDATION_ERROR' };
     }
     return { success: false, message: 'Error interno al listar ítems de la compra', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+/**
+ * Obtiene una compra en estado BORRADOR para edición llamando al SP sp_get_compra_para_edicion
+ * @param {number} compraId - ID de la compra
+ * @returns {Object} { success: boolean, message?: string, data?: { cabecera: Object, items: Array } }
+ */
+export async function service_GetCompraParaEdicion(compraId) {
+  let connection;
+  try {
+    if (!compraId) return { success: false, message: 'compra_id es requerido' };
+
+    connection = await service_DBconn();
+    const [rows] = await connection.execute('CALL sp_get_compra_para_edicion(?)', [parseInt(compraId)]);
+    
+    // El SP devuelve 2 resultsets: [0] = cabecera, [1] = items
+    const cabecera = rows[0]?.[0] || null;
+    const items = rows[1] || [];
+
+    if (!cabecera) {
+      return { success: false, message: 'Compra no encontrada o no está en estado BORRADOR' };
+    }
+
+    return { success: true, data: { cabecera, items } };
+  } catch (error) {
+    console.error('Error en service_GetCompraParaEdicion:', error);
+    if (error.message.includes('Sólo se puede editar')) {
+      return { success: false, message: 'Solo se puede editar una compra en estado BORRADOR' };
+    }
+    if (error.message.includes('La compra no existe')) {
+      return { success: false, message: 'La compra no existe' };
+    }
+    return { success: false, message: 'Error interno al obtener compra para edición', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
   } finally {
     if (connection) await connection.end();
   }

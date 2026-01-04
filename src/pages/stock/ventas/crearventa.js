@@ -613,7 +613,7 @@ export default function VentaBorradorView() {
 
   return (
     <ProtectedLayout>
-      <Container size="xl">
+      <Container size="lg">
         <Grid mt={20}>
           <Grid.Col span={12}>
             <Flex justify="space-between" align="center" mb="md">

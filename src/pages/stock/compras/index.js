@@ -324,7 +324,7 @@ export default function ComprasPage() {
                         <>
                           <Menu.Item
                             leftSection={<IconPencil size={14} />}
-                            onClick={() => router.push(`/stock/compras/crearcompra?id=${compra.id}`)}
+                            onClick={() => router.push(`/stock/compras/editar/${compra.id}`)}
                           >
                             Editar
                           </Menu.Item>

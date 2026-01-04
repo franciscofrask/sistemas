@@ -17,6 +17,7 @@ import {
   Avatar,
 
   Select,
+  ActionIcon,
 } from "@mantine/core";
 import {
   IconLayoutSidebarLeftCollapse,
@@ -25,6 +26,8 @@ import {
   IconLogout,
   IconSettings,
   IconChevronDown,
+  IconChevronRight,
+  IconChevronLeft,
 
 } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
@@ -41,7 +44,7 @@ const formatSegment = (segment) =>
 
 export function LayoutBase({ children }) {
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
-  const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
+  const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(false);
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, status } = useStableSession();
@@ -225,13 +228,45 @@ export function LayoutBase({ children }) {
     <AppShell
       header={{ height: 71 }}
       navbar={{
-        width: 300,
+        width: desktopOpened ? 250 : 70,
         breakpoint: "sm",
-        collapsed: { mobile: !mobileOpened, desktop: !desktopOpened },
+        collapsed: { mobile: !mobileOpened },
       }}
+      style={{ position: 'relative' }}
     >
+      {/* Flecha para expandir/contraer sidebar */}
+      <ActionIcon
+        onClick={toggleDesktop}
+        style={{
+          position: 'fixed',
+          top: '50%',
+          left: desktopOpened ? 250 : 70,
+          transform: 'translateY(-50%)',
+          zIndex: 1000,
+          backgroundColor: 'rgba(238, 14, 15, 0.1)',
+          color: 'rgba(238, 14, 15, 0.6)',
+          border: '1px solid rgba(238, 14, 15, 0.2)',
+          borderRadius: desktopOpened ? '0 8px 8px 0' : '0 8px 8px 0',
+          borderRight: desktopOpened ? 'none' : '1px solid rgba(238, 14, 15, 0.2)',
+          borderLeft: desktopOpened ? '1px solid rgba(238, 14, 15, 0.2)' : 'none',
+          padding: '8px 4px',
+          transition: 'all 0.2s ease',
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.backgroundColor = 'rgba(238, 14, 15, 0.2)';
+          e.target.style.color = 'rgba(238, 14, 15, 0.8)';
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.backgroundColor = 'rgba(238, 14, 15, 0.1)';
+          e.target.style.color = 'rgba(238, 14, 15, 0.6)';
+        }}
+        variant="transparent"
+        size="sm"
+      >
+        {desktopOpened ? <IconChevronLeft size={14} /> : <IconChevronRight size={14} />}
+      </ActionIcon>
       {/* Header */}
-      <AppShell.Header bg={"#140D0D"}>
+      <AppShell.Header bg={"#140D0D"} style={{ borderBottom: 'none' }}>
         <Group justify="space-between" h="100%" px="md">
           <Group>
             <UnstyledButton visibleFrom="sm" c={"white"} onClick={toggleDesktop}>
@@ -378,13 +413,21 @@ export function LayoutBase({ children }) {
       </AppShell.Header>
 
       {/* Sidebar */}
-      <AppShell.Navbar p="xs" bg={"#140D0D"}>
-        <Sidebar />
+      <AppShell.Navbar 
+        p={desktopOpened ? "xs" : "4"} 
+        pt={0} 
+        bg={"#140D0D"}
+      >
+        <Sidebar collapsed={!desktopOpened} />
       </AppShell.Navbar>
 
       {/* Contenido principal */}
-      <AppShell.Main>
-        <Container fluid>
+      <AppShell.Main
+        style={{
+          overflowX: 'auto',
+        }}
+      >
+        <Container fluid style={{ minWidth: 'max-content' }}>
           {breadcrumbs}
           {children}
         </Container>
