@@ -16,16 +16,16 @@ export default async function handler(req, res) {
       creado_por,
     } = req.body || {};
 
-    if (!proveedor_id || !almacen_id || !creado_por) {
-      return res.status(400).json({ success: false, message: 'proveedor_id, almacen_id y creado_por son requeridos' });
+    if (!proveedor_id || !almacen_id || !tipo_comprobante || !creado_por) {
+      return res.status(400).json({ success: false, message: 'proveedor_id, almacen_id, tipo_comprobante y creado_por son requeridos' });
     }
 
     const result = await service_CrearCompra({
       proveedorId: parseInt(proveedor_id),
       almacenId: parseInt(almacen_id),
       tipoComprobante: tipo_comprobante,
-      nroComprobante: nro_comprobante,
-      observaciones,
+      nroComprobante: nro_comprobante || '',
+      observaciones: observaciones || '',
       creadoPor: parseInt(creado_por),
     });
 

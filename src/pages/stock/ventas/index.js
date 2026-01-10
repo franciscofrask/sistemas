@@ -141,7 +141,7 @@ export default function VentasPage() {
 
   return (
     <ProtectedLayout>
-      <Container size="lg">
+      <Container size="xxl">
         <Title>Componente en desarrollo</Title>
         <Grid mt={20}>
           <Grid.Col span={12}>

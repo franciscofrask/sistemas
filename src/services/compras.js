@@ -192,9 +192,9 @@ export async function service_CrearCompra({
   try {
     if (!proveedorId) return { success: false, message: 'proveedor_id es requerido' };
     if (!almacenId) return { success: false, message: 'almacen_id es requerido' };
+    if (!tipoComprobante) return { success: false, message: 'tipo_comprobante (c\u00f3digo) es requerido' };
     if (!creadoPor) return { success: false, message: 'creado_por es requerido' };
 
-    const _tipo = typeof tipoComprobante === 'string' && tipoComprobante.trim() ? tipoComprobante.trim() : 'FACTURA';
     const _nro = typeof nroComprobante === 'string' ? nroComprobante : '';
     const _obs = typeof observaciones === 'string' ? observaciones : '';
 
@@ -203,7 +203,7 @@ export async function service_CrearCompra({
     const params = [
       parseInt(proveedorId),
       parseInt(almacenId),
-      _tipo,
+      tipoComprobante,
       _nro,
       _obs,
       parseInt(creadoPor),

@@ -113,7 +113,7 @@ export default function EditarCompra() {
   if (loading) {
     return (
       <ProtectedLayout requiredPermissions={["compras"]}>
-        <Container size="lg" py="xl">
+        <Container size="xxl" py="xl">
           <Group>
             <Loader size="sm" />
             <Text>Cargando compra para edición...</Text>
@@ -126,7 +126,7 @@ export default function EditarCompra() {
   if (error) {
     return (
       <ProtectedLayout requiredPermissions={["compras"]}>
-        <Container size="lg" py="xl">
+        <Container size="xxl" py="xl">
           <Alert color="red" icon={<IconAlertTriangle size={16} />} title="Error al cargar compra">
             {error}
           </Alert>
@@ -143,7 +143,7 @@ export default function EditarCompra() {
   if (!compra) {
     return (
       <ProtectedLayout requiredPermissions={["compras"]}>
-        <Container size="lg" py="xl">
+        <Container size="xxl" py="xl">
           <Alert color="yellow" icon={<IconAlertTriangle size={16} />} title="Compra no encontrada">
             No se encontró la compra o no está en estado BORRADOR para editar.
           </Alert>
@@ -162,13 +162,11 @@ export default function EditarCompra() {
 
   return (
     <ProtectedLayout requiredPermissions={["compras"]}>
-      <Container size="lg" py="xl">
+      <Container size="xxl" py="xl">
         {/* Header */}
         <Group justify="space-between" mb="lg">
           <Group>
-            <ActionIcon variant="default" onClick={() => router.back()}>
-              <IconArrowLeft size={16} />
-            </ActionIcon>
+           
             <Title order={2}>Editar Compra #{cabecera.compra_id}</Title>
             <Badge color="blue" variant="filled">
               {cabecera.estado}

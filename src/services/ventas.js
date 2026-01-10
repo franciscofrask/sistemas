@@ -5,7 +5,7 @@ import { service_DBconn } from './db.js';
  * @param {Object} params
  * @param {number} params.clienteId
  * @param {number} params.almacenId
- * @param {string} params.tipoComprobante
+ * @param {string} params.tipoComprobante - Código del tipo de comprobante (ej: 'FA', 'NC', 'TICKET')
  * @param {string} params.nroComprobante
  * @param {string} params.observaciones
  * @param {number} params.creadoPor
@@ -24,7 +24,7 @@ export async function service_CrearVenta({
   try {
     if (!clienteId) return { success: false, message: 'cliente_id es requerido' };
     if (!almacenId) return { success: false, message: 'almacen_id es requerido' };
-    if (!tipoComprobante) tipoComprobante = 'TICKET';
+    if (!tipoComprobante) return { success: false, message: 'tipo_comprobante (código) es requerido' };
     if (typeof nroComprobante !== 'string') nroComprobante = '';
     if (typeof observaciones !== 'string') observaciones = '';
     if (!creadoPor) return { success: false, message: 'creado_por es requerido' };
@@ -315,6 +315,28 @@ export async function service_GetDetalleVenta(ventaId) {
       return { success: false, message: error.sqlMessage || 'Error de validación', error: 'VALIDATION_ERROR' };
     }
     return { success: false, message: 'Error interno al obtener detalle de la venta', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+/**
+ * Lista tipos de comprobantes disponibles (SP: sp_listar_tipos_comprobantes)
+ * @param {string|null} modulo - Ej: 'VENTA', 'COMPRA' o null para todos
+ */
+export async function service_ListarTiposComprobantes(modulo = null) {
+  let connection;
+  try {
+    connection = await service_DBconn();
+    const [rows] = await connection.execute('CALL sp_listar_tipos_comprobantes(?)', [modulo || null]);
+
+    const items = rows?.[0] || [];
+    return { success: true, data: items };
+  } catch (error) {
+    if (error?.sqlState === '45000') {
+      return { success: false, message: error.sqlMessage || 'Error de validación', error: 'VALIDATION_ERROR' };
+    }
+    return { success: false, message: 'Error interno al listar tipos de comprobante', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
   } finally {
     if (connection) await connection.end();
   }

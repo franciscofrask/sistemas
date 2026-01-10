@@ -102,7 +102,7 @@ export default function DetalleCompra() {
 
   return (
     <ProtectedLayout>
-      <Container size="xl" py="lg">
+      <Container size="xxl" py="lg">
         <LoadingOverlay visible={loading} />
 
         {/* Header */}

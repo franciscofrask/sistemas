@@ -18,12 +18,13 @@ export default async function handler(req, res) {
 
     if (!cliente_id) return res.status(400).json({ success: false, message: 'cliente_id es requerido' });
     if (!almacen_id) return res.status(400).json({ success: false, message: 'almacen_id es requerido' });
+    if (!tipo_comprobante) return res.status(400).json({ success: false, message: 'tipo_comprobante es requerido' });
     if (!creado_por) return res.status(400).json({ success: false, message: 'creado_por es requerido' });
 
     const result = await service_CrearVenta({
       clienteId: parseInt(cliente_id),
       almacenId: parseInt(almacen_id),
-      tipoComprobante: tipo_comprobante || 'TICKET',
+      tipoComprobante: tipo_comprobante,
       nroComprobante: nro_comprobante || '',
       observaciones: observaciones || '',
       creadoPor: parseInt(creado_por),

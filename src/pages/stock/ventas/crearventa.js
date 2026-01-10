@@ -27,6 +27,7 @@ import { useDisclosure, useDebouncedValue } from "@mantine/hooks";
 import { IconPlus, IconTrash, IconCheck, IconX, IconEdit, IconArrowLeft, IconSearch } from "@tabler/icons-react";
 import { useRouter } from "next/router";
 import { useStableSession } from "@/hooks/useStableSession";
+import { notifications } from '@mantine/notifications';
 
 /**
  * Vista: Venta en BORRADOR (UI mock)
@@ -65,13 +66,17 @@ export default function VentaBorradorView() {
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [debouncedBusqueda] = useDebouncedValue(busquedaProducto, 300);
 
+  // Tipos de comprobante desde SP
+  const [tiposComprobantes, setTiposComprobantes] = useState([]);
+  const [loadingTiposComprobantes, setLoadingTiposComprobantes] = useState(true);
+
   // Estado venta (mock). En real: viene de sp_get_venta o endpoint GET /ventas/:id
   const [venta, setVenta] = useState({
     id: null, // se crea al presionar "Agregar Producto"
     estado: "BORRADOR",
     clienteId: "2", // cliente con ID 2 por defecto
     almacenId: "2", // se actualizará desde localStorage en useEffect
-    tipoComprobante: "TICKET",
+    tipoComprobante: "", // se asignará desde la API de tipos_comprobantes
     nroComprobante: "",
     observaciones: "",
   });
@@ -183,6 +188,44 @@ export default function VentaBorradorView() {
 
     fetchClientes();
     fetchAlmacenes();
+  }, []);
+
+  // Cargar tipos de comprobante desde el SP
+  useEffect(() => {
+    const fetchTiposComprobantes = async () => {
+      try {
+        setLoadingTiposComprobantes(true);
+        const resp = await fetch('/api/stock/ventas/tipos-comprobantes?modulo=VENTA');
+        const data = await resp.json();
+
+        if (resp.ok && data.success) {
+          const mapped = (data.data || []).map((tc) => ({
+            value: tc.codigo,        // código: 'FA', 'NC', 'TICKET', etc.
+            label: tc.nombre,        // nombre descriptivo
+          }));
+          setTiposComprobantes(mapped);
+
+          // Asegurar valor por defecto: usar el primer tipo disponible
+          setVenta((v) => {
+            // Si ya tiene un código válido, mantenerlo
+            if (v.tipoComprobante && mapped.some((m) => m.value === v.tipoComprobante)) {
+              return v;
+            }
+            // Asignar el primer tipo disponible
+            const fallback = mapped[0]?.value || '';
+            return { ...v, tipoComprobante: fallback };
+          });
+        } else {
+          console.error('Error cargando tipos de comprobante:', data?.message);
+        }
+      } catch (err) {
+        console.error('Error inesperado cargando tipos de comprobante:', err);
+      } finally {
+        setLoadingTiposComprobantes(false);
+      }
+    };
+
+    fetchTiposComprobantes();
   }, []);
 
   // Función para buscar items vendibles
@@ -577,6 +620,19 @@ export default function VentaBorradorView() {
         return;
       }
       setVenta((v) => ({ ...v, estado: 'CONFIRMADA' }));
+      
+      // Mostrar alerta de éxito
+      notifications.show({
+        title: '¡Venta confirmada!',
+        message: 'La venta ha sido confirmada exitosamente',
+        color: 'green',
+        autoClose: 2000,
+      });
+      
+      // Redirigir al detalle de la venta
+      setTimeout(() => {
+        router.push(`/stock/ventas/detalle/${venta.id}`);
+      }, 2000);
     } catch (e) {
       console.error('Error confirmando venta:', e);
       alert(e.message || 'Error al confirmar la venta');
@@ -613,8 +669,9 @@ export default function VentaBorradorView() {
 
   return (
     <ProtectedLayout>
-      <Container size="lg">
-        <Grid mt={20}>
+      <Container size="xl" py="xs">
+        <Stack gap="sm">
+          <Grid>
           <Grid.Col span={12}>
             <Flex justify="space-between" align="center" mb="md">
               <Stack gap={2}>
@@ -662,14 +719,15 @@ export default function VentaBorradorView() {
 
           <Grid.Col span={12}>
 
-      <Card withBorder radius="md" mb="md">
-        <Title order={4} mb="sm">
+      <Card withBorder radius="md" mb="xs" p="sm">
+        <Title order={5} mb="xs">
           Información de la Venta
         </Title>
 
-        <Grid>
+        <Grid gutter="xs">
           <Grid.Col span={6} md={3}>
             <Select
+              size="sm"
               label="Cliente"
               data={clientes}
               value={venta.clienteId}
@@ -678,10 +736,12 @@ export default function VentaBorradorView() {
               description={loadingClientes ? "Cargando clientes..." : "Por defecto: Cliente ID 2"}
               searchable
               placeholder={loadingClientes ? "Cargando..." : "Buscar cliente..."}
+              comboboxProps={{ transitionProps: { transition: 'fade', duration: 100 } }}
             />
           </Grid.Col>
           <Grid.Col span={6} md={3}>
             <Select
+              size="sm"
               label="Almacén"
               data={almacenes}
               value={venta.almacenId}
@@ -696,23 +756,25 @@ export default function VentaBorradorView() {
               }
               searchable
               placeholder={loadingAlmacenes ? "Cargando..." : "Buscar almacén..."}
+              comboboxProps={{ transitionProps: { transition: 'fade', duration: 100 } }}
             />
           </Grid.Col>
           <Grid.Col span={6} md={3}>
             <Select
+              size="sm"
               label="Tipo comprobante"
-              data={[
-                { value: "TICKET", label: "TICKET" },
-                { value: "REMITO", label: "REMITO" },
-                { value: "FACTURA_INTERNA", label: "FACTURA_INTERNA" },
-              ]}
+              data={tiposComprobantes}
               value={venta.tipoComprobante}
               onChange={(value) => setVenta((v) => ({ ...v, tipoComprobante: value }))}
-              disabled={!editable}
+              disabled={!editable || loadingTiposComprobantes}
+              placeholder={loadingTiposComprobantes ? 'Cargando...' : 'Seleccionar tipo'}
+              description={loadingTiposComprobantes ? 'Cargando tipos de comprobante...' : undefined}
+              comboboxProps={{ transitionProps: { transition: 'fade', duration: 100 } }}
             />
           </Grid.Col>
           <Grid.Col span={6} md={3}>
             <TextInput
+              size="sm"
               label="Nro comprobante"
               value={venta.nroComprobante}
               onChange={(e) => setVenta((v) => ({ ...v, nroComprobante: e.currentTarget.value }))}
@@ -722,6 +784,7 @@ export default function VentaBorradorView() {
           </Grid.Col>
           <Grid.Col span={12}>
             <TextInput
+              size="sm"
               label="Observaciones"
               value={venta.observaciones}
               onChange={(e) => setVenta((v) => ({ ...v, observaciones: e.currentTarget.value }))}
@@ -734,17 +797,18 @@ export default function VentaBorradorView() {
           </Grid.Col>
 
           <Grid.Col span={12}>
-            <Card withBorder radius="md">
-              <Group justify="space-between" mb="sm">
-                <Title order={4}>Productos</Title>
-                <Button leftSection={<IconPlus size={16} />} onClick={onOpenAdd} disabled={!editable} variant="outline" color="#EE0E0F">
+            <Card withBorder radius="md" p="sm">
+              <Group justify="space-between" mb="xs">
+                <Title order={5}>Productos</Title>
+                <Button size="sm" leftSection={<IconPlus size={16} />} onClick={onOpenAdd} disabled={!editable} variant="outline" color="#EE0E0F">
                   Agregar Producto
                 </Button>
               </Group>
 
-        <Divider mb="sm" />
+        <Divider mb="xs" />
 
-        <Table striped highlightOnHover>
+        <Box style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          <Table striped highlightOnHover fontSize="sm">
           <Table.Thead>
             <Table.Tr>
               <Table.Th ta="center">Producto</Table.Th>
@@ -832,20 +896,14 @@ export default function VentaBorradorView() {
             )}
           </Table.Tbody>
         </Table>
+        </Box>
 
-        <Divider my="sm" />
+        <Divider my="xs" />
 
-        <Flex justify="flex-end">
-          <Stack gap={2} w={320}>
-            <Group justify="space-between">
-              <Text c="dimmed">Total</Text>
-              <Text fw={700}>{money(total)}</Text>
-            </Group>
-            <Text size="xs" c="dimmed">
-              En real: el total debería venir del backend (no confiar en cálculos del front).
-            </Text>
-          </Stack>
-        </Flex>
+        <Group justify="flex-end" p="xs" bg="gray.0" style={{ borderRadius: '4px' }}>
+          <Text size="sm" c="dimmed">Total:</Text>
+          <Text size="lg" fw={700}>{money(total)}</Text>
+        </Group>
       </Card>
 
       <Modal
@@ -1014,6 +1072,7 @@ export default function VentaBorradorView() {
       </Modal>
           </Grid.Col>
         </Grid>
+        </Stack>
       </Container>
     </ProtectedLayout>
   );
