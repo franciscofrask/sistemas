@@ -38,12 +38,15 @@ export default function VentaDetallePage() {
         const resp = await fetch(`/api/stock/ventas/detalle?venta_id=${id}`);
         const data = await resp.json();
         if (!resp.ok || !data.success) {
+          console.error('Error en API detalle venta:', data);
           setError(data?.message || 'No se pudo obtener el detalle');
           return;
         }
+        
+        console.log('Datos recibidos del API:', data.data);
         setVenta(data.data.venta);
-        setItems(data.data.items || []);
-        setMovs(data.data.movimientos || []);
+        setItems(Array.isArray(data.data.items) ? data.data.items : []);
+        setMovs(Array.isArray(data.data.movimientos) ? data.data.movimientos : []);
       } catch (e) {
         setError(e.message || 'Error inesperado');
       } finally {
@@ -98,7 +101,7 @@ export default function VentaDetallePage() {
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {items.length === 0 ? (
+                    {!Array.isArray(items) || items.length === 0 ? (
                       <Table.Tr><Table.Td colSpan={6} ta="center"><Text c="dimmed">Sin ítems</Text></Table.Td></Table.Tr>
                     ) : items.map((it) => (
                       <Table.Tr key={it.venta_detalle_id}>
@@ -152,7 +155,7 @@ export default function VentaDetallePage() {
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {movs.length === 0 ? (
+                    {!Array.isArray(movs) || movs.length === 0 ? (
                       <Table.Tr><Table.Td colSpan={7} ta="center"><Text c="dimmed">Sin movimientos</Text></Table.Td></Table.Tr>
                     ) : movs.map((m) => (
                       <Table.Tr key={m.movimiento_id}>

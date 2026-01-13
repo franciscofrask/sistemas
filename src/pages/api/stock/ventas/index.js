@@ -17,6 +17,8 @@ export default async function handler(req, res) {
       offset,
     } = req.query || {};
 
+    console.log('API /stock/ventas - parámetros recibidos:', req.query);
+
     const result = await service_ListarVentas({
       almacenId: almacen_id ? parseInt(almacen_id) : null,
       clienteId: cliente_id ? parseInt(cliente_id) : null,
@@ -26,6 +28,13 @@ export default async function handler(req, res) {
       busqueda: q || null,
       limit: limit ? parseInt(limit) : 50,
       offset: offset ? parseInt(offset) : 0,
+    });
+
+    console.log('API /stock/ventas - resultado del servicio:', {
+      success: result.success,
+      dataExists: !!result.data,
+      itemsLength: result.data?.items?.length,
+      total: result.data?.total
     });
 
     if (!result.success) {

@@ -70,6 +70,10 @@ export default function VentaBorradorView() {
   const [tiposComprobantes, setTiposComprobantes] = useState([]);
   const [loadingTiposComprobantes, setLoadingTiposComprobantes] = useState(true);
 
+  // Condiciones de pago desde API
+  const [condicionesPago, setCondicionesPago] = useState([]);
+  const [loadingCondicionesPago, setLoadingCondicionesPago] = useState(true);
+
   // Estado venta (mock). En real: viene de sp_get_venta o endpoint GET /ventas/:id
   const [venta, setVenta] = useState({
     id: null, // se crea al presionar "Agregar Producto"
@@ -77,6 +81,7 @@ export default function VentaBorradorView() {
     clienteId: "2", // cliente con ID 2 por defecto
     almacenId: "2", // se actualizará desde localStorage en useEffect
     tipoComprobante: "", // se asignará desde la API de tipos_comprobantes
+    condicionPago: "CONTADO", // condición de pago por defecto
     nroComprobante: "",
     observaciones: "",
   });
@@ -226,6 +231,51 @@ export default function VentaBorradorView() {
     };
 
     fetchTiposComprobantes();
+  }, []);
+
+  // Cargar condiciones de pago desde la API
+  useEffect(() => {
+    const fetchCondicionesPago = async () => {
+      try {
+        setLoadingCondicionesPago(true);
+        const resp = await fetch('/api/stock/ventas/condiciones-pago');
+        const data = await resp.json();
+
+        if (resp.ok && data.success) {
+          const mapped = (data.data || []).map((cp) => ({
+            value: cp.codigo,        // código: 'CONTADO', 'CUENTA_CORRIENTE', etc.
+            label: cp.nombre,        // nombre descriptivo
+          }));
+          setCondicionesPago(mapped);
+
+          // Asegurar valor por defecto
+          setVenta((v) => {
+            if (v.condicionPago && mapped.some((m) => m.value === v.condicionPago)) {
+              return v;
+            }
+            return { ...v, condicionPago: 'CONTADO' };
+          });
+        } else {
+          console.error('Error cargando condiciones de pago:', data?.message);
+          // Fallback en caso de error
+          setCondicionesPago([
+            { value: 'CONTADO', label: 'Contado' },
+            { value: 'CUENTA_CORRIENTE', label: 'Cuenta corriente' },
+          ]);
+        }
+      } catch (err) {
+        console.error('Error inesperado cargando condiciones de pago:', err);
+        // Fallback en caso de error
+        setCondicionesPago([
+          { value: 'CONTADO', label: 'Contado' },
+          { value: 'CUENTA_CORRIENTE', label: 'Cuenta corriente' },
+        ]);
+      } finally {
+        setLoadingCondicionesPago(false);
+      }
+    };
+
+    fetchCondicionesPago();
   }, []);
 
   // Función para buscar items vendibles
@@ -407,6 +457,7 @@ export default function VentaBorradorView() {
           clienteId: String(v.cliente_id),
           almacenId: String(v.almacen_id),
           tipoComprobante: v.tipo_comprobante,
+          condicionPago: v.condicion_pago_codigo || 'CONTADO',
           nroComprobante: v.nro_comprobante || '',
           observaciones: v.observaciones || '',
         }));
@@ -434,6 +485,17 @@ export default function VentaBorradorView() {
   async function onOpenAdd() {
     if (!editable) return;
     resetModal();
+
+    // Verificar que el usuario esté autenticado
+    if (sessionStatus === 'loading') {
+      alert('Espere a que se cargue la sesión de usuario...');
+      return;
+    }
+
+    if (sessionStatus === 'unauthenticated' || !session?.user?.id) {
+      alert('Debe iniciar sesión para crear ventas.');
+      return;
+    }
 
     // Si la venta ya tiene id, solo abrir modal
     if (venta.id) {
@@ -470,6 +532,7 @@ export default function VentaBorradorView() {
         cliente_id: parseInt(venta.clienteId),
         almacen_id: parseInt(almacenIdEnvio),
         tipo_comprobante: venta.tipoComprobante,
+        condicion_pago_codigo: venta.condicionPago,
         nro_comprobante: venta.nroComprobante || '',
         observaciones: venta.observaciones || '',
         creado_por: session?.user?.id ? parseInt(session.user.id) : null,
@@ -477,7 +540,8 @@ export default function VentaBorradorView() {
       };
 
       if (!payload.creado_por) {
-        alert('No se puede crear la venta: usuario no autenticado.');
+        console.error('Error de autenticación:', { session, sessionStatus });
+        alert('No se puede crear la venta: usuario no autenticado. Por favor, inicie sesión nuevamente.');
         setCreandoVenta(false);
         return;
       }
@@ -607,6 +671,16 @@ export default function VentaBorradorView() {
     if (items.length === 0) return alert("Agregá al menos 1 ítem antes de confirmar.");
     if (!venta.id) return alert('La venta aún no fue creada.');
 
+    // Validación adicional en frontend para cuenta corriente
+    const condicionActual = condicionesPago.find(cp => cp.value === venta.condicionPago);
+    if (condicionActual && venta.condicionPago === 'CUENTA_CORRIENTE') {
+      const clienteActual = clientes.find(c => c.value === venta.clienteId);
+      if (!clienteActual || clienteActual.label.toLowerCase().includes('consumidor final')) {
+        alert('Para ventas en cuenta corriente debe seleccionar un cliente específico (no "Consumidor final").');
+        return;
+      }
+    }
+
     try {
       setConfirmando(true);
       const resp = await fetch('/api/stock/ventas/confirmar', {
@@ -616,26 +690,41 @@ export default function VentaBorradorView() {
       });
       const data = await resp.json();
       if (!resp.ok || !data.success) {
-        alert(data?.message || 'No se pudo confirmar la venta');
+        // Mostrar mensaje específico del servidor
+        const errorMsg = data?.message || 'No se pudo confirmar la venta';
+        
+        notifications.show({
+          title: 'Error al confirmar venta',
+          message: errorMsg,
+          color: 'red',
+          autoClose: 6000,
+          withCloseButton: true,
+        });
         return;
       }
+      
       setVenta((v) => ({ ...v, estado: 'CONFIRMADA' }));
       
       // Mostrar alerta de éxito
       notifications.show({
         title: '¡Venta confirmada!',
-        message: 'La venta ha sido confirmada exitosamente',
+        message: 'La venta ha sido confirmada exitosamente y los movimientos de stock se generaron correctamente',
         color: 'green',
-        autoClose: 2000,
+        autoClose: 3000,
       });
       
       // Redirigir al detalle de la venta
       setTimeout(() => {
         router.push(`/stock/ventas/detalle/${venta.id}`);
-      }, 2000);
+      }, 3000);
     } catch (e) {
       console.error('Error confirmando venta:', e);
-      alert(e.message || 'Error al confirmar la venta');
+      notifications.show({
+        title: 'Error de conexión',
+        message: 'No se pudo conectar con el servidor. Intente nuevamente.',
+        color: 'red',
+        autoClose: 5000,
+      });
     } finally {
       setConfirmando(false);
     }
@@ -773,6 +862,19 @@ export default function VentaBorradorView() {
             />
           </Grid.Col>
           <Grid.Col span={6} md={3}>
+            <Select
+              size="sm"
+              label="Condición de pago"
+              data={condicionesPago}
+              value={venta.condicionPago}
+              onChange={(value) => setVenta((v) => ({ ...v, condicionPago: value }))}
+              disabled={!editable || loadingCondicionesPago}
+              placeholder={loadingCondicionesPago ? 'Cargando...' : 'Seleccionar condición'}
+              description={loadingCondicionesPago ? 'Cargando condiciones de pago...' : undefined}
+              comboboxProps={{ transitionProps: { transition: 'fade', duration: 100 } }}
+            />
+          </Grid.Col>
+          <Grid.Col span={6} md={3}>
             <TextInput
               size="sm"
               label="Nro comprobante"
@@ -781,6 +883,9 @@ export default function VentaBorradorView() {
               disabled={!editable}
               placeholder="Opcional"
             />
+          </Grid.Col>
+          <Grid.Col span={6} md={3}>
+            <div></div> {/* Spacer para mantener el layout */}
           </Grid.Col>
           <Grid.Col span={12}>
             <TextInput
@@ -800,8 +905,16 @@ export default function VentaBorradorView() {
             <Card withBorder radius="md" p="sm">
               <Group justify="space-between" mb="xs">
                 <Title order={5}>Productos</Title>
-                <Button size="sm" leftSection={<IconPlus size={16} />} onClick={onOpenAdd} disabled={!editable} variant="outline" color="#EE0E0F">
-                  Agregar Producto
+                <Button 
+                  size="sm" 
+                  leftSection={<IconPlus size={16} />} 
+                  onClick={onOpenAdd} 
+                  disabled={!editable || sessionStatus === 'loading' || creandoVenta} 
+                  loading={creandoVenta}
+                  variant="outline" 
+                  color="#EE0E0F"
+                >
+                  {creandoVenta ? 'Creando venta...' : 'Agregar Producto'}
                 </Button>
               </Group>
 

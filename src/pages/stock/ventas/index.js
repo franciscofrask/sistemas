@@ -46,7 +46,10 @@ export default function VentasPage() {
       const res = await fetch(`/api/stock/ventas?${params.toString()}`);
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json?.message || 'No se pudo listar ventas');
-      const items = json.data?.items || [];
+      
+      console.log('Respuesta del API ventas:', json);
+      
+      const items = Array.isArray(json.data?.items) ? json.data.items : [];
       setVentas(items);
       setTotal(Number(json.data?.total || items.length));
     } catch (error) {
@@ -100,7 +103,7 @@ export default function VentasPage() {
 
   // Acciones futuras: ver/editar ventas
 
-  const rows = ventas.map((v) => (
+  const rows = Array.isArray(ventas) ? ventas.map((v) => (
     <tr key={v.id}>
       <td>{v.nro_comprobante || '-'}</td>
       <td>{new Date(v.fecha).toLocaleString()}</td>
@@ -137,7 +140,7 @@ export default function VentasPage() {
         </Group>
       </td>
     </tr>
-  ));
+  )) : [];
 
   return (
     <ProtectedLayout>
@@ -191,7 +194,13 @@ export default function VentasPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {ventas.map((v) => (
+                    {!Array.isArray(ventas) || ventas.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                          No hay ventas para mostrar
+                        </td>
+                      </tr>
+                    ) : ventas.map((v) => (
                       <tr key={v.id}>
                         <td style={{ textAlign: 'center' }}>{v.nro_comprobante || '-'}</td>
                         <td style={{ textAlign: 'center' }}>{new Date(v.fecha).toLocaleString()}</td>

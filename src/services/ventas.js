@@ -10,6 +10,7 @@ import { service_DBconn } from './db.js';
  * @param {string} params.observaciones
  * @param {number} params.creadoPor
  * @param {number|null} params.presupuestoId
+ * @param {string} params.condicionPagoCodigo - Código de condición de pago (ej: 'CONTADO', 'CUENTA_CORRIENTE')
  */
 export async function service_CrearVenta({
   clienteId,
@@ -19,6 +20,7 @@ export async function service_CrearVenta({
   observaciones,
   creadoPor,
   presupuestoId = null,
+  condicionPagoCodigo = 'CONTADO',
 }) {
   let connection;
   try {
@@ -28,6 +30,7 @@ export async function service_CrearVenta({
     if (typeof nroComprobante !== 'string') nroComprobante = '';
     if (typeof observaciones !== 'string') observaciones = '';
     if (!creadoPor) return { success: false, message: 'creado_por es requerido' };
+    if (typeof condicionPagoCodigo !== 'string') condicionPagoCodigo = 'CONTADO';
 
     connection = await service_DBconn();
 
@@ -39,10 +42,11 @@ export async function service_CrearVenta({
       observaciones,
       parseInt(creadoPor),
       presupuestoId ? parseInt(presupuestoId) : null,
+      condicionPagoCodigo,
     ];
 
     const [rows] = await connection.execute(
-      'CALL sp_crear_venta(?, ?, ?, ?, ?, ?, ?)',
+      'CALL sp_crear_venta(?, ?, ?, ?, ?, ?, ?, ?)',
       params
     );
 
@@ -156,12 +160,46 @@ export async function service_ConfirmarVenta(ventaId) {
     connection = await service_DBconn();
     await connection.execute('CALL sp_confirmar_venta(?)', [parseInt(ventaId)]);
 
-    return { success: true, message: 'Venta confirmada' };
+    return { success: true, message: 'Venta confirmada exitosamente' };
   } catch (error) {
+    console.error('Error en service_ConfirmarVenta:', error);
+    
     if (error?.sqlState === '45000') {
-      return { success: false, message: error.sqlMessage || 'Error de validación', error: 'VALIDATION_ERROR' };
+      // Manejar errores específicos de validación del SP
+      const errorMessage = error.sqlMessage || 'Error de validación';
+      
+      // Mapear errores comunes para mejor UX
+      let friendlyMessage = errorMessage;
+      
+      if (errorMessage.includes('condición de pago inválida')) {
+        friendlyMessage = 'La venta tiene una condición de pago que no existe o es inválida';
+      } else if (errorMessage.includes('condición de pago está inactiva')) {
+        friendlyMessage = 'No se puede confirmar: la condición de pago seleccionada está inactiva';
+      } else if (errorMessage.includes('Cuenta corriente requiere un cliente')) {
+        friendlyMessage = 'Para ventas en cuenta corriente debe seleccionar un cliente específico';
+      } else if (errorMessage.includes('Consumidor final')) {
+        friendlyMessage = 'No se puede confirmar en cuenta corriente con "Consumidor final". Seleccione un cliente específico o cambie la condición de pago';
+      } else if (errorMessage.includes('no tiene ítems cargados')) {
+        friendlyMessage = 'La venta debe tener al menos un producto agregado antes de confirmar';
+      } else if (errorMessage.includes('Falta lote')) {
+        friendlyMessage = 'Error: hay productos que requieren lote pero no lo tienen asignado';
+      } else if (errorMessage.includes('Falta serie')) {
+        friendlyMessage = 'Error: hay productos que requieren número de serie pero no lo tienen asignado';
+      }
+      
+      return { 
+        success: false, 
+        message: friendlyMessage,
+        originalError: errorMessage,
+        error: 'VALIDATION_ERROR' 
+      };
     }
-    return { success: false, message: 'Error interno al confirmar venta', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
+    
+    return { 
+      success: false, 
+      message: 'Error interno del servidor al confirmar venta', 
+      error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' 
+    };
   } finally {
     if (connection) await connection.end();
   }
@@ -204,12 +242,38 @@ export async function service_ListarVentas({
       parseInt(offset) || 0,
     ];
 
+    console.log('Ejecutando sp_listar_ventas con parámetros:', params);
     const [rows] = await connection.execute('CALL sp_listar_ventas(?, ?, ?, ?, ?, ?, ?, ?)', params);
+    console.log('Resultados del SP sp_listar_ventas:', rows);
+    console.log('Estructura rows:', {
+      length: rows.length,
+      firstResult: rows[0]?.length,
+      secondResult: rows[1]?.length,
+      sample: rows[0]?.slice(0, 2)
+    });
 
-    const totalRow = rows?.[0]?.[0] || { total_count: 0 };
-    const items = rows?.[1] || [];
-    return { success: true, data: { total: Number(totalRow.total_count || 0), items } };
+    // Verificar si el SP retorna directamente los items o si tiene estructura de total + items
+    let total = 0;
+    let items = [];
+
+    if (Array.isArray(rows[0]) && rows[0].length > 0) {
+      // Si el primer resultado parece ser items (tiene propiedades de venta)
+      const firstRow = rows[0][0];
+      if (firstRow && (firstRow.id || firstRow.fecha || firstRow.cliente_nombre)) {
+        // Es directamente la lista de ventas
+        items = rows[0];
+        total = items.length;
+      } else if (firstRow && firstRow.total_count !== undefined) {
+        // Es el formato esperado: primer resultado = total, segundo = items
+        total = Number(firstRow.total_count || 0);
+        items = Array.isArray(rows[1]) ? rows[1] : [];
+      }
+    }
+
+    console.log(`Procesado: ${items.length} items, total: ${total}`);
+    return { success: true, data: { total, items } };
   } catch (error) {
+    console.error('Error en service_ListarVentas:', error);
     if (error?.sqlState === '45000') {
       return { success: false, message: error.sqlMessage || 'Error de validación', error: 'VALIDATION_ERROR' };
     }
@@ -303,14 +367,21 @@ export async function service_GetDetalleVenta(ventaId) {
     connection = await service_DBconn();
     const [rows] = await connection.execute('CALL sp_get_detalle_venta(?)', [parseInt(ventaId)]);
 
+    console.log('Resultados del SP sp_get_detalle_venta:', rows);
+
     const cabecera = rows?.[0]?.[0] || null;
-    const items = rows?.[1] || [];
-    const movimientos = rows?.[2] || [];
+    const items = Array.isArray(rows?.[1]) ? rows[1] : [];
+    const movimientos = Array.isArray(rows?.[2]) ? rows[2] : [];
+    
     if (!cabecera) {
       return { success: false, message: 'Venta no encontrada' };
     }
+    
+    console.log('Datos procesados:', { cabecera, items: items.length, movimientos: movimientos.length });
+    
     return { success: true, data: { venta: cabecera, items, movimientos } };
   } catch (error) {
+    console.error('Error en service_GetDetalleVenta:', error);
     if (error?.sqlState === '45000') {
       return { success: false, message: error.sqlMessage || 'Error de validación', error: 'VALIDATION_ERROR' };
     }
@@ -337,6 +408,32 @@ export async function service_ListarTiposComprobantes(modulo = null) {
       return { success: false, message: error.sqlMessage || 'Error de validación', error: 'VALIDATION_ERROR' };
     }
     return { success: false, message: 'Error interno al listar tipos de comprobante', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+/**
+ * Lista condiciones de pago activas
+ * @returns {Promise<Object>} - Resultado con success y datos
+ */
+export async function service_ListarCondicionesPago() {
+  let connection;
+  try {
+    connection = await service_DBconn();
+    
+    const [rows] = await connection.execute(
+      'SELECT id, codigo, nombre, requiere_cobranza, es_cta_cte, dias_vencimiento FROM condiciones_pago WHERE activo = 1 ORDER BY id ASC'
+    );
+
+    return { success: true, data: rows };
+  } catch (error) {
+    console.error('Error en service_ListarCondicionesPago:', error);
+    return { 
+      success: false, 
+      message: 'Error interno al listar condiciones de pago', 
+      error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' 
+    };
   } finally {
     if (connection) await connection.end();
   }

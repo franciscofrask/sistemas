@@ -14,6 +14,7 @@ export default async function handler(req, res) {
       observaciones,
       creado_por,
       presupuesto_id,
+      condicion_pago_codigo,
     } = req.body || {};
 
     if (!cliente_id) return res.status(400).json({ success: false, message: 'cliente_id es requerido' });
@@ -29,6 +30,7 @@ export default async function handler(req, res) {
       observaciones: observaciones || '',
       creadoPor: parseInt(creado_por),
       presupuestoId: presupuesto_id ? parseInt(presupuesto_id) : null,
+      condicionPagoCodigo: condicion_pago_codigo || 'CONTADO',
     });
 
     if (!result.success) {
