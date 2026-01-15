@@ -660,12 +660,184 @@ export default function VentaBorradorView() {
     }
   }
 
-  function removeItem(itemId) {
+  const [quitandoItem, setQuitandoItem] = useState(false);
+  const [cantidadesEditadas, setCantidadesEditadas] = useState({});
+  const [actualizandoCantidad, setActualizandoCantidad] = useState(false);
+  
+  async function removeItem(itemId) {
     if (!editable) return;
-    setItems((prev) => prev.filter((x) => x.id !== itemId));
+    
+    // Confirmar antes de quitar el item
+    const confirmar = window.confirm('¿Está seguro que desea quitar este ítem de la venta?');
+    if (!confirmar) return;
+    
+    try {
+      setQuitandoItem(true);
+      
+      // Si la venta ya tiene ID (existe en BD), llamar al API
+      if (venta.id) {
+        const resp = await fetch('/api/stock/ventas/quitar-item', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ venta_detalle_id: parseInt(itemId) }),
+        });
+        
+        const data = await resp.json();
+        
+        if (!resp.ok || !data.success) {
+          throw new Error(data?.message || 'No se pudo quitar el ítem');
+        }
+        
+        // Actualizar el total de la venta
+        setVenta(prev => ({ ...prev, total: data.data.nuevo_total }));
+        
+        notifications.show({
+          title: 'Ítem eliminado',
+          message: 'El ítem se quitó correctamente de la venta',
+          color: 'green',
+          autoClose: 3000,
+        });
+        
+        // Recargar la lista de items
+        await loadItemsVenta(venta.id);
+      } else {
+        // Si la venta no tiene ID aún (solo local), quitar del state
+        setItems((prev) => prev.filter((x) => x.id !== itemId));
+      }
+    } catch (error) {
+      console.error('Error quitando ítem:', error);
+      notifications.show({
+        title: 'Error al quitar ítem',
+        message: error.message || 'No se pudo quitar el ítem',
+        color: 'red',
+        autoClose: 5000,
+      });
+    } finally {
+      setQuitandoItem(false);
+    }
   }
+  
+  // Función para actualizar la cantidad de un item
+  async function actualizarCantidadItem(itemId, nuevaCantidad) {
+    if (!editable || !venta.id) return;
+    
+    try {
+      setActualizandoCantidad(true);
+      
+      const resp = await fetch('/api/stock/ventas/actualizar-cantidad', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          venta_detalle_id: parseInt(itemId),
+          nueva_cantidad: parseFloat(nuevaCantidad)
+        }),
+      });
+      
+      const data = await resp.json();
+      
+      if (!resp.ok || !data.success) {
+        throw new Error(data?.message || 'No se pudo actualizar la cantidad');
+      }
+      
+      // Actualizar el total de la venta
+      setVenta(prev => ({ ...prev, total: data.data.nuevo_total }));
+      
+      // Limpiar el estado de cantidad editada para este item
+      setCantidadesEditadas(prev => {
+        const newState = { ...prev };
+        delete newState[itemId];
+        return newState;
+      });
+      
+      notifications.show({
+        title: 'Cantidad actualizada',
+        message: 'La cantidad se actualizó correctamente',
+        color: 'green',
+        autoClose: 3000,
+      });
+      
+      // Recargar la lista de items
+      await loadItemsVenta(venta.id);
+    } catch (error) {
+      console.error('Error actualizando cantidad:', error);
+      notifications.show({
+        title: 'Error al actualizar cantidad',
+        message: error.message || 'No se pudo actualizar la cantidad',
+        color: 'red',
+        autoClose: 5000,
+      });
+    } finally {
+      setActualizandoCantidad(false);
+    }
+  }
+  
+  // Función para manejar cambio en cantidad
+  const handleCantidadChange = (itemId, nuevaCantidad) => {
+    setCantidadesEditadas(prev => ({
+      ...prev,
+      [itemId]: nuevaCantidad
+    }));
+  };
+  
+  // Función para cancelar edición de cantidad
+  const cancelarEdicionCantidad = (itemId) => {
+    setCantidadesEditadas(prev => {
+      const newState = { ...prev };
+      delete newState[itemId];
+      return newState;
+    });
+  };
 
   const [confirmando, setConfirmando] = useState(false);
+  const [guardandoCabecera, setGuardandoCabecera] = useState(false);
+  
+  // Función para guardar los cambios en la cabecera de la venta cuando se está editando
+  async function guardarCabecera() {
+    if (!editable || !venta.id) return;
+    
+    try {
+      setGuardandoCabecera(true);
+      
+      const resp = await fetch('/api/stock/ventas/editar', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          venta_id: parseInt(venta.id),
+          cliente_id: parseInt(venta.clienteId),
+          almacen_id: parseInt(venta.almacenId),
+          tipo_comprobante: venta.tipoComprobante,
+          nro_comprobante: venta.nroComprobante,
+          observaciones: venta.observaciones,
+          condicion_pago_codigo: venta.condicionPago,
+        }),
+      });
+      
+      const data = await resp.json();
+      
+      if (!resp.ok || !data.success) {
+        throw new Error(data?.message || 'No se pudo actualizar la venta');
+      }
+      
+      notifications.show({
+        title: 'Venta actualizada',
+        message: 'Los datos de la venta se guardaron correctamente',
+        color: 'green',
+        autoClose: 3000,
+      });
+      
+    } catch (error) {
+      console.error('Error guardando cabecera:', error);
+      notifications.show({
+        title: 'Error al guardar',
+        message: error.message || 'No se pudieron guardar los cambios',
+        color: 'red',
+        autoClose: 5000,
+      });
+    } finally {
+      setGuardandoCabecera(false);
+    }
+  }
+  
   async function confirmarVenta() {
     if (!editable) return;
     if (items.length === 0) return alert("Agregá al menos 1 ítem antes de confirmar.");
@@ -783,6 +955,18 @@ export default function VentaBorradorView() {
         </Stack>
 
               <Group>
+                {editable && venta.id && (
+                  <Button
+                    color="blue"
+                    variant="outline"
+                    leftSection={<IconCheck size={16} />}
+                    onClick={guardarCabecera}
+                    disabled={guardandoCabecera}
+                    loading={guardandoCabecera}
+                  >
+                    {guardandoCabecera ? 'Guardando...' : 'Guardar Cambios'}
+                  </Button>
+                )}
                 <Button
                   leftSection={<IconCheck size={16} />}
                   onClick={confirmarVenta}
@@ -982,9 +1166,57 @@ export default function VentaBorradorView() {
                       )}
                     </Stack>
                   </Table.Td>
-                  <Table.Td ta="center">{it.cantidad}</Table.Td>
+                  <Table.Td ta="center">
+                    {editable && venta.id ? (
+                      <Group justify="center" align="center" gap="xs">
+                        <NumberInput
+                          value={cantidadesEditadas[it.id] !== undefined ? cantidadesEditadas[it.id] : it.cantidad}
+                          onChange={(value) => handleCantidadChange(it.id, value)}
+                          min={0.001}
+                          step={0.001}
+                          decimalScale={3}
+                          size="xs"
+                          w={80}
+                          disabled={actualizandoCantidad}
+                        />
+                        {cantidadesEditadas[it.id] !== undefined && (
+                          <Group gap={2}>
+                            <Tooltip label="Guardar cantidad">
+                              <ActionIcon
+                                variant="light"
+                                color="green"
+                                size="sm"
+                                onClick={() => actualizarCantidadItem(it.id, cantidadesEditadas[it.id])}
+                                disabled={actualizandoCantidad}
+                                loading={actualizandoCantidad}
+                              >
+                                <IconCheck size={14} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Cancelar">
+                              <ActionIcon
+                                variant="light"
+                                color="gray"
+                                size="sm"
+                                onClick={() => cancelarEdicionCantidad(it.id)}
+                                disabled={actualizandoCantidad}
+                              >
+                                <IconX size={14} />
+                              </ActionIcon>
+                            </Tooltip>
+                          </Group>
+                        )}
+                      </Group>
+                    ) : (
+                      it.cantidad
+                    )}
+                  </Table.Td>
                   <Table.Td ta="center">{money(it.precioUnitario)}</Table.Td>
-                  <Table.Td ta="center">{money(it.cantidad * it.precioUnitario)}</Table.Td>
+                  <Table.Td ta="center">
+                    {money(
+                      (cantidadesEditadas[it.id] !== undefined ? cantidadesEditadas[it.id] : it.cantidad) * it.precioUnitario
+                    )}
+                  </Table.Td>
                   <Table.Td ta="center">
                     <Group justify="center" gap="xs">
                       <Tooltip label="Editar (mock)">
@@ -997,7 +1229,8 @@ export default function VentaBorradorView() {
                           variant="light"
                           color="red"
                           onClick={() => removeItem(it.id)}
-                          disabled={!editable}
+                          disabled={!editable || quitandoItem}
+                          loading={quitandoItem}
                         >
                           <IconTrash size={16} />
                         </ActionIcon>

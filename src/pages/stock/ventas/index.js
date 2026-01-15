@@ -190,13 +190,14 @@ export default function VentasPage() {
                       <th style={{ textAlign: 'center' }}>Cliente</th>
                       <th style={{ textAlign: 'center' }}>Total</th>
                       <th style={{ textAlign: 'center' }}>Estado</th>
+                      <th style={{ textAlign: 'center' }}>Estado de Pago</th>
                       <th style={{ textAlign: 'center' }}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {!Array.isArray(ventas) || ventas.length === 0 ? (
                       <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
                           No hay ventas para mostrar
                         </td>
                       </tr>
@@ -207,6 +208,7 @@ export default function VentasPage() {
                         <td style={{ textAlign: 'center' }}>{v.cliente_nombre}</td>
                         <td style={{ textAlign: 'center' }}>${Number(v.total || 0).toFixed(2)}</td>
                         <td style={{ textAlign: 'center' }}>{v.estado}</td>
+                        <td style={{ textAlign: 'center' }}>{v.estado_pago || '-'}</td>
                         <td style={{ textAlign: 'center' }}>
                           <Group gap="xs" justify="center">
                             <Menu position="bottom-start" withinPortal>

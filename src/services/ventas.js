@@ -438,3 +438,160 @@ export async function service_ListarCondicionesPago() {
     if (connection) await connection.end();
   }
 }
+
+/**
+ * Edita una venta en estado BORRADOR llamando al SP sp_editar_venta_borrador
+ * @param {Object} params
+ * @param {number} params.ventaId
+ * @param {number} params.clienteId
+ * @param {number} params.almacenId
+ * @param {string} params.tipoComprobante
+ * @param {string} params.nroComprobante
+ * @param {string} params.observaciones
+ * @param {string} params.condicionPagoCodigo
+ */
+export async function service_EditarVentaBorrador({
+  ventaId,
+  clienteId,
+  almacenId,
+  tipoComprobante,
+  nroComprobante,
+  observaciones,
+  condicionPagoCodigo = 'CONTADO',
+}) {
+  let connection;
+  try {
+    if (!ventaId) return { success: false, message: 'venta_id es requerido' };
+    if (!clienteId) return { success: false, message: 'cliente_id es requerido' };
+    if (!almacenId) return { success: false, message: 'almacen_id es requerido' };
+    if (!tipoComprobante) return { success: false, message: 'tipo_comprobante es requerido' };
+    if (typeof nroComprobante !== 'string') nroComprobante = '';
+    if (typeof observaciones !== 'string') observaciones = '';
+    if (typeof condicionPagoCodigo !== 'string') condicionPagoCodigo = 'CONTADO';
+
+    connection = await service_DBconn();
+
+    const params = [
+      parseInt(ventaId),
+      parseInt(clienteId),
+      parseInt(almacenId),
+      tipoComprobante,
+      nroComprobante,
+      observaciones,
+      condicionPagoCodigo,
+    ];
+
+    const [rows] = await connection.execute(
+      'CALL sp_editar_venta_borrador(?, ?, ?, ?, ?, ?, ?)',
+      params
+    );
+
+    const ventaActualizada = rows?.[0]?.[0];
+
+    if (!ventaActualizada) {
+      return { success: false, message: 'No se pudo editar la venta' };
+    }
+
+    return {
+      success: true,
+      data: { venta: ventaActualizada },
+      message: 'Venta actualizada correctamente',
+    };
+  } catch (error) {
+    if (error?.sqlState === '45000') {
+      return { success: false, message: error.sqlMessage || 'Error de validación', error: 'VALIDATION_ERROR' };
+    }
+    return { success: false, message: 'Error interno al editar venta', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+/**
+ * Quita un ítem de una venta en estado BORRADOR llamando al SP sp_quitar_item_venta
+ * @param {Object} params
+ * @param {number} params.ventaDetalleId
+ */
+export async function service_QuitarItemVenta({
+  ventaDetalleId,
+}) {
+  let connection;
+  try {
+    if (!ventaDetalleId) return { success: false, message: 'venta_detalle_id es requerido' };
+
+    connection = await service_DBconn();
+
+    const [rows] = await connection.execute(
+      'CALL sp_quitar_item_venta(?)',
+      [parseInt(ventaDetalleId)]
+    );
+
+    const result = rows?.[0]?.[0];
+
+    if (!result) {
+      return { success: false, message: 'No se pudo quitar el ítem' };
+    }
+
+    return {
+      success: true,
+      data: { 
+        venta_id: result.venta_id,
+        nuevo_total: result.nuevo_total 
+      },
+      message: 'Ítem eliminado correctamente',
+    };
+  } catch (error) {
+    if (error?.sqlState === '45000') {
+      return { success: false, message: error.sqlMessage || 'Error de validación', error: 'VALIDATION_ERROR' };
+    }
+    return { success: false, message: 'Error interno al quitar ítem', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+/**
+ * Actualiza la cantidad de un ítem en una venta en estado BORRADOR llamando al SP sp_actualizar_cantidad_item_venta
+ * @param {Object} params
+ * @param {number} params.ventaDetalleId
+ * @param {number} params.nuevaCantidad
+ */
+export async function service_ActualizarCantidadItemVenta({
+  ventaDetalleId,
+  nuevaCantidad,
+}) {
+  let connection;
+  try {
+    if (!ventaDetalleId) return { success: false, message: 'venta_detalle_id es requerido' };
+    if (nuevaCantidad == null || nuevaCantidad <= 0) return { success: false, message: 'La cantidad debe ser mayor a 0' };
+
+    connection = await service_DBconn();
+
+    const [rows] = await connection.execute(
+      'CALL sp_actualizar_cantidad_item_venta(?, ?)',
+      [parseInt(ventaDetalleId), parseFloat(nuevaCantidad)]
+    );
+
+    const result = rows?.[0]?.[0];
+
+    if (!result) {
+      return { success: false, message: 'No se pudo actualizar la cantidad' };
+    }
+
+    return {
+      success: true,
+      data: { 
+        venta_id: result.venta_id,
+        nuevo_total: result.nuevo_total 
+      },
+      message: 'Cantidad actualizada correctamente',
+    };
+  } catch (error) {
+    if (error?.sqlState === '45000') {
+      return { success: false, message: error.sqlMessage || 'Error de validación', error: 'VALIDATION_ERROR' };
+    }
+    return { success: false, message: 'Error interno al actualizar cantidad', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
+  } finally {
+    if (connection) await connection.end();
+  }
+}

@@ -156,7 +156,7 @@ const RouteGuard = ({ children }) => {
                     <Loader size="xl" />
                     <Text size="lg">Verificando permisos...</Text>
                     <Text size="sm" c="dimmed">
-                        Comprobando acceso a {router.asPath}
+                        Comprobando acceso a {router.pathname}
                     </Text>
                 </Stack>
             </Center>
