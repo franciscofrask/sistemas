@@ -595,3 +595,60 @@ export async function service_ActualizarCantidadItemVenta({
     if (connection) await connection.end();
   }
 }
+
+/**
+ * Registra una cobranza aplicada a una venta llamando al SP sp_registrar_cobranza_aplicada
+ * @param {Object} params
+ * @param {number} params.clienteId
+ * @param {number} params.ventaId
+ * @param {number} params.importe
+ * @param {string} params.observaciones
+ * @param {number} params.creadoPor
+ */
+export async function service_RegistrarCobranzaAplicada({
+  clienteId,
+  ventaId,
+  importe,
+  observaciones = '',
+  creadoPor,
+}) {
+  let connection;
+  try {
+    if (!clienteId) return { success: false, message: 'cliente_id es requerido' };
+    if (!ventaId) return { success: false, message: 'venta_id es requerido' };
+    if (!importe || importe <= 0) return { success: false, message: 'El importe debe ser mayor a 0' };
+    if (!creadoPor) return { success: false, message: 'creado_por es requerido' };
+
+    connection = await service_DBconn();
+
+    const [rows] = await connection.execute(
+      'CALL sp_registrar_cobranza_aplicada(?, ?, ?, ?, ?)',
+      [
+        parseInt(clienteId),
+        parseInt(ventaId),
+        parseFloat(importe),
+        observaciones || '',
+        parseInt(creadoPor)
+      ]
+    );
+
+    const result = rows?.[0]?.[0];
+
+    if (!result) {
+      return { success: false, message: 'No se pudo registrar la cobranza' };
+    }
+
+    return {
+      success: true,
+      data: { cobranza_id: result.cobranza_id },
+      message: 'Cobranza registrada correctamente',
+    };
+  } catch (error) {
+    if (error?.sqlState === '45000') {
+      return { success: false, message: error.sqlMessage || 'Error de validación', error: 'VALIDATION_ERROR' };
+    }
+    return { success: false, message: 'Error interno al registrar cobranza', error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR' };
+  } finally {
+    if (connection) await connection.end();
+  }
+}

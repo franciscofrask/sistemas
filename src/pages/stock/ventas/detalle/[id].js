@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import ProtectedLayout from '@/components/Layout/ProtectedLayout';
 import { useRouter } from 'next/router';
+import { useStableSession } from '@/hooks/useStableSession';
+import { notifications } from '@mantine/notifications';
 import {
   Container,
   Title,
@@ -14,7 +16,14 @@ import {
   Table,
   Loader,
   Badge,
+  Button,
+  Modal,
+  NumberInput,
+  Textarea,
+  TextInput,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { IconCash, IconX } from '@tabler/icons-react';
 
 function money(n) {
   const v = Number(n || 0);
@@ -23,11 +32,18 @@ function money(n) {
 
 export default function VentaDetallePage() {
   const router = useRouter();
+  const { data: session, status: sessionStatus } = useStableSession();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [venta, setVenta] = useState(null);
   const [items, setItems] = useState([]);
   const [movs, setMovs] = useState([]);
+  
+  // Estados para modal de pago
+  const [opened, { open, close }] = useDisclosure(false);
+  const [importe, setImporte] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+  const [registrandoPago, setRegistrandoPago] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -56,6 +72,109 @@ export default function VentaDetallePage() {
     load();
   }, [router.query?.id]);
 
+  const registrarPago = async () => {
+    const importeNumero = parseFloat(importe);
+    if (!importe || isNaN(importeNumero) || importeNumero <= 0) {
+      notifications.show({
+        title: 'Error',
+        message: 'Debe ingresar un importe válido',
+        color: 'red',
+      });
+      return;
+    }
+
+    console.log('Estado de sesión:', {
+      session,
+      sessionStatus,
+      userId: session?.user?.id,
+      hasSession: !!session,
+      hasUser: !!session?.user
+    });
+
+    if (sessionStatus === 'loading') {
+      notifications.show({
+        title: 'Error',
+        message: 'Esperando autenticación...',
+        color: 'orange',
+      });
+      return;
+    }
+
+    if (!session?.user?.id) {
+      notifications.show({
+        title: 'Error',
+        message: 'Debe estar autenticado para registrar pagos',
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      setRegistrandoPago(true);
+      
+      console.log('Iniciando registro de pago...', {
+        cliente_id: venta.cliente_id,
+        venta_id: venta.id,
+        importe: importeNumero,
+        observaciones: observaciones,
+        creado_por: session.user.id,
+      });
+      
+      const resp = await fetch('/api/stock/ventas/registrar-cobranza', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cliente_id: venta.cliente_id,
+          venta_id: venta.id,
+          importe: importeNumero,
+          observaciones: observaciones,
+          creado_por: session.user.id,
+        }),
+      });
+      
+      console.log('Respuesta recibida:', resp.status, resp.ok);
+      
+      const data = await resp.json();
+      
+      console.log('Datos de respuesta:', data);
+      
+      if (!resp.ok || !data.success) {
+        throw new Error(data?.message || 'No se pudo registrar el pago');
+      }
+      
+      notifications.show({
+        title: 'Pago registrado',
+        message: 'El pago se registró correctamente',
+        color: 'green',
+      });
+      
+      // Cerrar modal y limpiar campos
+      close();
+      setImporte('');
+      setObservaciones('');
+      
+      // Recargar datos de la venta
+      const id = router.query?.id ? parseInt(router.query.id) : null;
+      if (id) {
+        const respVenta = await fetch(`/api/stock/ventas/detalle?venta_id=${id}`);
+        const dataVenta = await respVenta.json();
+        if (respVenta.ok && dataVenta.success) {
+          setVenta(dataVenta.data.venta);
+        }
+      }
+    } catch (error) {
+      console.error('Error completo en registrarPago:', error);
+      notifications.show({
+        title: 'Error al registrar pago',
+        message: error.message || 'Error desconocido',
+        color: 'red',
+        autoClose: 5000,
+      });
+    } finally {
+      setRegistrandoPago(false);
+    }
+  };
+
   return (
     <ProtectedLayout>
       <Container size="lg">
@@ -76,8 +195,29 @@ export default function VentaDetallePage() {
                     <Text size="sm" c="dimmed">Comprobante: {venta.tipo_comprobante} {venta.nro_comprobante || ''}</Text>
                   </Stack>
                   <Stack align="flex-end">
-                    <Badge color={venta.estado === 'CONFIRMADA' ? 'green' : venta.estado === 'ANULADA' ? 'red' : 'gray'}>{venta.estado}</Badge>
+                    <Group>
+                      <Badge color={venta.estado === 'CONFIRMADA' ? 'green' : venta.estado === 'ANULADA' ? 'red' : 'gray'}>{venta.estado}</Badge>
+                      {venta.estado_pago && (
+                        <Badge color={venta.estado_pago === 'PAGADA' ? 'green' : venta.estado_pago === 'PARCIAL' ? 'yellow' : 'red'}>
+                          {venta.estado_pago}
+                        </Badge>
+                      )}
+                    </Group>
                     <Text fw={700}>{money(venta.total)}</Text>
+                    {venta.saldo_pendiente != null && venta.saldo_pendiente > 0 && (
+                      <Text size="sm" c="orange">Saldo pendiente: {money(venta.saldo_pendiente)}</Text>
+                    )}
+                    {venta.estado === 'CONFIRMADA' && venta.estado_pago !== 'PAGADA' && (
+                      <Button
+                        leftSection={<IconCash size={16} />}
+                        onClick={open}
+                        color="green"
+                        variant="outline"
+                        size="sm"
+                      >
+                        Registrar Pago
+                      </Button>
+                    )}
                   </Stack>
                 </Group>
                 {venta.observaciones && (
@@ -180,6 +320,61 @@ export default function VentaDetallePage() {
           </Grid>
         ) : null}
       </Container>
+      
+      <Modal
+        opened={opened}
+        onClose={close}
+        title="Registrar Pago"
+        size="md"
+      >
+        <Stack>
+          <Text size="sm" c="dimmed">
+            Venta #{venta?.id} - Total: {venta ? money(venta.total) : ''}
+          </Text>
+          {venta?.saldo_pendiente != null && (
+            <Text size="sm" c="orange">
+              Saldo pendiente: {money(venta.saldo_pendiente)}
+            </Text>
+          )}
+          
+          <TextInput
+            label="Importe a pagar"
+            placeholder="0.00"
+            value={importe}
+            onChange={(e) => setImporte(e.currentTarget.value)}
+            type="number"
+            step="0.01"
+            min="0.01"
+            max={venta?.saldo_pendiente || 0}
+            required
+          />
+          
+          <Textarea
+            label="Observaciones"
+            placeholder="Observaciones del pago (opcional)"
+            value={observaciones}
+            onChange={(e) => setObservaciones(e.currentTarget.value)}
+            rows={3}
+          />
+          
+          <Group justify="flex-end">
+            <Button
+              variant="outline"
+              onClick={close}
+              disabled={registrandoPago}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={registrarPago}
+              loading={registrandoPago}
+              disabled={!importe || isNaN(parseFloat(importe)) || parseFloat(importe) <= 0}
+            >
+              Registrar Pago
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </ProtectedLayout>
   );
 }
