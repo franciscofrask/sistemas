@@ -87,6 +87,11 @@ export function useFuncionalidades() {
                     { label: 'Ventas', path: '/stock/ventas' },
                     { label: 'Crear Venta', path: '/stock/ventas/crearventa' }
                 ];
+            } else if (nombre === 'clientes') {
+                menuItem.children = [
+                    { label: 'Listado de Clientes', path: '/stock/clientes' },
+                    { label: 'Cuenta Corriente', path: '/stock/clientes/cuenta-corriente-de-clientes' }
+                ];
             } else if (nombre === 'administracion') {
                 menuItem.children = [
                     { label: 'Usuarios', path: '/admin/usuarios' }

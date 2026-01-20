@@ -228,3 +228,59 @@ export async function service_ObtenerCliente(_db, clienteId) {
         throw new Error('Error obteniendo cliente: ' + err.message);
     }
 }
+
+/**
+ * Lista los movimientos de cuenta corriente de clientes
+ * @param {Object} _db - Conexión a la base de datos
+ * @param {Object} params
+ * @param {number|null} params.clienteId - ID del cliente (opcional)
+ * @param {string|null} params.fechaDesde - Fecha desde (opcional)
+ * @param {string|null} params.fechaHasta - Fecha hasta (opcional)
+ */
+export async function service_ListarCtaCteClientes(_db, { clienteId = null, fechaDesde = null, fechaHasta = null } = {}) {
+    console.log('Listando cuenta corriente clientes:', { clienteId, fechaDesde, fechaHasta });
+    
+    try {
+        // Llamar al procedimiento almacenado
+        const [results] = await _db.execute(
+            'CALL sp_listar_ctacte_clientes(?, ?, ?)',
+            [
+                clienteId ? parseInt(clienteId) : null,
+                fechaDesde || null,
+                fechaHasta || null
+            ]
+        );
+
+        console.log('Resultado del SP cuenta corriente:', {
+            resultSets: results.length,
+            movimientos: results[0]?.length,
+            totales: results[1]?.length
+        });
+        
+        // El SP retorna dos conjuntos de resultados:
+        // results[0] = movimientos detallados con saldo
+        // results[1] = totales por cliente
+        const movimientos = Array.isArray(results[0]) ? results[0] : [];
+        const totales = Array.isArray(results[1]) ? results[1] : [];
+        
+        return {
+            success: true,
+            data: {
+                movimientos,
+                totales
+            },
+            message: 'Cuenta corriente obtenida exitosamente'
+        };
+
+    } catch (err) {
+        console.error('Error en service_ListarCtaCteClientes:', err);
+        
+        // Manejar errores específicos del negocio si los hay
+        if (err.sqlState === '45000') {
+            throw new Error(err.sqlMessage || 'Error de validación en cuenta corriente');
+        }
+        
+        // Error genérico
+        throw new Error('Error obteniendo cuenta corriente: ' + err.message);
+    }
+}
