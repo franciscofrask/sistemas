@@ -11,6 +11,7 @@ export default function Home() {
 
   useEffect(() => {
     if (status === "authenticated") {
+      console.log("Usuario autenticado:", status);
       router.push("/stock/dashboard");
     }
   }, [router, status]);
